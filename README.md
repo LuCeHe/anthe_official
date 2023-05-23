@@ -1,10 +1,8 @@
 
 # Anthe
 
-Anthe is an architecture that achieves better performance than Transformer with less parameters.
 This is the official repository for the article [Less is More!
-A slim architecture for optimal language translation](https://arxiv.org/pdf/2305.10991.pdf), recently submitted 
-to NeurIPS 2023.
+A slim architecture for optimal language translation](https://arxiv.org/pdf/2305.10991.pdf). Anthe is an architecture that improves on the Transformer performance with fewer parameters.
 
 To run the experiments run the ```main.py``` file. If you want to activate the Transformer architecture, pass the 
 argument ```--comments=sameemb_projectoutput```. If you want to activate the Anthe architecture, pass the argument 
