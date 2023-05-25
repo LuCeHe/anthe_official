@@ -11,13 +11,15 @@ the WMT14 dataset. If you want to use the WMT17 add the following text to the co
 ```--comments=..._lpair:cs-en```, where the available
 language pairs are cs-en, de-en, fi-en, lv-en, ru-en, tr-en, zh-en.
 
+You can install it as a package with ```pip install anthe-official```.
+
 ## Layers Available
 
 The following layers are available for the Anthe architecture, only in TensorFlow 2.10.0 for now. 
 You can access the Anthe architecture, the AntheEncoderBlock and the AntheDecoderBlock, like so:
 
 ```python
-from anthe_official.neural_models import Anthe, AntheEncoderBlock, AntheDecoderBlock
+from anthe_official import Anthe, AntheEncoderBlock, AntheDecoderBlock
 
 model = Anthe(
     inputs_vocab_size, target_vocab_size, encoder_count, decoder_count, attention_head_count,
@@ -39,7 +41,7 @@ The TC versions of the Dense, Conv1D and Embedding,
 and the SoftPOS and the HSoftPOS, can be accessed like so:
 
 ```python
-from anthe_official.neural_models import *
+from anthe_official import *
 
 tc_dense = TCDense(d_model, length=3, ratio=.2)
 tc_conv1d = TCConv1D(filters, kernel_size, tc_length=3, ratio=.2)
