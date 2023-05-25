@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
-__version__ = '1.0.1'
+__version__ = '1.0.0'
 
 setup(
     name='anthe_official',

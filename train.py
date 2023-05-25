@@ -1,15 +1,14 @@
 from __future__ import (absolute_import, division, print_function, unicode_literals)
 import tensorflow as tf
 import os, argparse, random, socket, time, json, shutil, sys
-    
+
 sys.path.append('../')
-        
+
 from pyaromatics.keras_tools.esoteric_callbacks.several_validations import MultipleValidationSets
 from pyaromatics.keras_tools.model_checkpoint import CustomModelCheckpoint
 from pyaromatics.keras_tools.silence_tensorflow import silence_tf
 
 silence_tf()
-
 
 import numpy as np
 import pandas as pd
@@ -23,57 +22,55 @@ from filmformer.generation_data.data_loader import WMT_ENDE
 from filmformer.generation_data.wmt17 import WMT17
 from filmformer.neural_models.transformer import build_model
 
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-FILENAME = os.path.realpath("/global/u1/e/ermal/ff_test/filformer")
+FILENAME = os.path.realpath(__file__)
 CDIR = os.path.dirname(FILENAME)
-DATADIR = os.path.abspath(os.path.join(CDIR, 'data', 'wmt'))
+DATADIR = os.path.abspath(os.path.join(CDIR, '..', 'data', 'wmt'))
 os.makedirs(DATADIR, exist_ok=True)
 
 EXPERIMENTS = os.path.join(CDIR, 'experiments')
-CKPT_BEST = os.path.join(CDIR,'ckpt_best')
-CKPT = os.path.join(CDIR,'ckpt')
+CKPT_BEST = os.path.join(CDIR, 'ckpt_best')
+CKPT = os.path.join(CDIR, 'ckpt')
 named_tuple = time.localtime()  # get struct_time
 time_string = time.strftime("%Y-%m-%d--%H-%M-%S--", named_tuple)
-#random_string = ''.join([str(r) for r in np.random.choice(10, 4)])
-
+random_string = ''.join([str(r) for r in np.random.choice(10, 5)])
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-            "--comments",
-        default='lpair:tr-en',
+        "--comments",
+        default='',
         type=str, help="String to activate extra behaviors")
     parser.add_argument("--seed", default=39, type=int, help="Random seed")
     parser.add_argument("--epochs", default=3, type=int, help="Epochs")
     parser.add_argument("--steps_per_epoch", default=1, type=int, help="Steps per epoch")
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size")
     parser.add_argument("--stop_time", default=2000, type=int, help="Stop time")
-    parser.add_argument("--d_model", default=512, type=int, help="Stop time")
-    # parser.add_argument("--language_pair", default='ende', type=str, help="Select Language Pair")
+    parser.add_argument("--d_model", default=512, type=int, help="Model width")
     parser.add_argument("--results_dir", default=EXPERIMENTS, type=str, help="Experiments Folder")
     parser.add_argument("--checkpoint_dir", default=CKPT, type=str, help="Checkpoints Folder")
-    parser.add_argument("--checkpoint_period", default=5, type=int, help="Checkpoint frequency in epochs, if <=0, no saving")
+    parser.add_argument("--checkpoint_period", default=5, type=int,
+                        help="Checkpoint frequency in epochs, if <=0, no saving")
     parser.add_argument("--save_best", default=1, type=int, help="whether to save best model 1/0 -> True/False")
     args = parser.parse_args()
 
-    EXPERIMENT = os.path.join(args.results_dir, '_'+time_string)
+    EXPERIMENT = os.path.join(args.results_dir, time_string + random_string)
     args.experiment_dir = EXPERIMENT
     os.makedirs(EXPERIMENT, exist_ok=True)
-    
-    MODEL = os.path.join(args.checkpoint_dir, '_'+time_string)
+
+    MODEL = os.path.join(args.checkpoint_dir, time_string + random_string)
     args.ckpt_dir = MODEL
     os.makedirs(MODEL, exist_ok=True)
-        
-    MODEL = os.path.join(CKPT_BEST, '_'+time_string)
+
+    MODEL = os.path.join(CKPT_BEST, time_string + random_string)
     args.ckpt_best_dir = MODEL
     os.makedirs(MODEL, exist_ok=True)
 
     return args
 
-    
+
 def main(args):
     comments = args.comments
     results = vars(args)
@@ -82,11 +79,11 @@ def main(args):
     experiment_dir = args.experiment_dir
     ckpt_dir = args.ckpt_dir
     ckpt_best_dir = args.ckpt_best_dir
-    
+
     print(experiment_dir)
     print(ckpt_dir)
     print(ckpt_best_dir)
-        
+
     # set seed
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -96,7 +93,7 @@ def main(args):
     nlayers = str2val(args.comments, 'nlayers', int, default=6)
 
     TRAIN_RATIO = 0.9
-    D_POINT_WISE_FF = 4*args.d_model
+    D_POINT_WISE_FF = 4 * args.d_model
     D_MODEL = args.d_model
     ENCODER_COUNT = DECODER_COUNT = nlayers
     ATTENTION_HEAD_COUNT = 8
@@ -119,7 +116,7 @@ def main(args):
         lpair = str2val(args.comments, 'lpair', str, default='cs-en')
         maxlen = str2val(args.comments, 'maxlen', int, default=256)
         generator = lambda data_split: \
-                WMT17(lpair, args.batch_size, epochs=args.epochs, steps_per_epoch=args.steps_per_epoch,
+            WMT17(lpair, args.batch_size, epochs=args.epochs, steps_per_epoch=args.steps_per_epoch,
                   data_split=data_split, comments=comments, maxlen=maxlen)
 
         gen_train = generator('train')
@@ -127,30 +124,30 @@ def main(args):
         gen_test = generator('test')
     else:
         generator = lambda data_split: \
-                WMT_ENDE(
-                    data_dir=DATADIR, batch_size=GLOBAL_BATCH_SIZE, bpe_vocab_size=BPE_VOCAB_SIZE,
-                    seq_max_len_source=SEQ_MAX_LEN_SOURCE, seq_max_len_target=SEQ_MAX_LEN_TARGET, data_limit=DATA_LIMIT,
-                    train_ratio=TRAIN_RATIO, epochs=args.epochs, steps_per_epoch=args.steps_per_epoch,
-                    data_split=data_split,
-                    comments=comments)
-            
+            WMT_ENDE(
+                data_dir=DATADIR, batch_size=GLOBAL_BATCH_SIZE, bpe_vocab_size=BPE_VOCAB_SIZE,
+                seq_max_len_source=SEQ_MAX_LEN_SOURCE, seq_max_len_target=SEQ_MAX_LEN_TARGET, data_limit=DATA_LIMIT,
+                train_ratio=TRAIN_RATIO, epochs=args.epochs, steps_per_epoch=args.steps_per_epoch,
+                data_split=data_split,
+                comments=comments)
+
         gen_train = generator('train')
         gen_train.produce_masks = True
         gen_val = generator('val')
         gen_val.produce_masks = True
 
     model = build_model(
-            inputs_timesteps=SEQ_MAX_LEN_SOURCE,
-            target_timesteps=SEQ_MAX_LEN_TARGET,
-            inputs_vocab_size=BPE_VOCAB_SIZE,
-            target_vocab_size=BPE_VOCAB_SIZE,
-            encoder_count=ENCODER_COUNT,
-            decoder_count=DECODER_COUNT,
-            attention_head_count=ATTENTION_HEAD_COUNT,
-            d_model=D_MODEL,
-            d_point_wise_ff=D_POINT_WISE_FF,
-            dropout_prob=DROPOUT_PROB,
-            comments=args.comments)
+        inputs_timesteps=SEQ_MAX_LEN_SOURCE,
+        target_timesteps=SEQ_MAX_LEN_TARGET,
+        inputs_vocab_size=BPE_VOCAB_SIZE,
+        target_vocab_size=BPE_VOCAB_SIZE,
+        encoder_count=ENCODER_COUNT,
+        decoder_count=DECODER_COUNT,
+        attention_head_count=ATTENTION_HEAD_COUNT,
+        d_model=D_MODEL,
+        d_point_wise_ff=D_POINT_WISE_FF,
+        dropout_prob=DROPOUT_PROB,
+        comments=args.comments)
 
     results['n_params'] = model.count_params()
     save_results(results, args.experiment_dir)
@@ -175,33 +172,33 @@ def main(args):
         TimeStopping(args.stop_time, 1, stop_within_epoch=True),
         tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
     ]
-    if args.save_best>0:
+    if args.save_best > 0:
         model_checkpoint_best = CustomModelCheckpoint(
-            filepath=ckpt_best_dir+'/'+'best_model.h5',
+            filepath=ckpt_best_dir + '/' + 'best_model.h5',
             save_weights_only=True,
-            monitor='val_loss', #'val_sparse_perplexity', 'val_sparse_categorical_accuracy' 'val_sparse_categorical_crossentropy' 
+            monitor='val_loss',
+            # 'val_sparse_perplexity', 'val_sparse_categorical_accuracy' 'val_sparse_categorical_crossentropy'
             mode='min',
             save_best_only=True,
             verbose=0)
         callbacks.append(model_checkpoint_best)
-        
-    if args.checkpoint_period>0:
+
+    if args.checkpoint_period > 0:
         model_checkpoint = CustomModelCheckpoint(
-            filepath=ckpt_dir+'/'+'last_model.h5',
+            filepath=ckpt_dir + '/' + 'last_model.h5',
             save_weights_only=False,
             save_best_only=False,
             verbose=0,
-            save_freq="period",period=args.checkpoint_period)
+            save_freq="period", period=args.checkpoint_period)
         callbacks.append(model_checkpoint)
 
     history_path = os.path.join(experiment_dir, 'history.csv')
-    
-        
-    if 'lpair' in comments:
-        callbacks.append(MultipleValidationSets({'t': gen_test}, verbose=1),)
 
-    callbacks.append(CSVLogger(history_path),)
-        # notice that the wmt dataloader does not work with shuffle=True
+    if 'lpair' in comments:
+        callbacks.append(MultipleValidationSets({'t': gen_test}, verbose=1), )
+
+    callbacks.append(CSVLogger(history_path), )
+    # notice that the wmt dataloader does not work with shuffle=True
     shuffle = False if 'lpair' in comments else True
     model.fit(gen_train, validation_data=gen_val, callbacks=callbacks, epochs=args.epochs, shuffle=shuffle)
 
@@ -219,7 +216,8 @@ def main(args):
         all_chunks = [no_vals_keys[x:x + lengh_keys] for x in range(0, len(no_vals_keys), lengh_keys)]
         for i, subkeys in enumerate(all_chunks):
             history_dict = {k: history_df[k].tolist() for k in subkeys}
-            history_dict.update({'val_' + k: history_df['val_' + k].tolist() for k in subkeys if 'val_' + k in history_keys})
+            history_dict.update(
+                {'val_' + k: history_df['val_' + k].tolist() for k in subkeys if 'val_' + k in history_keys})
             plot_filename = os.path.join(experiment_dir, f'history_{i}.png')
             plot_history(histories=history_dict, plot_filename=plot_filename, epochs=args.epochs)
 
