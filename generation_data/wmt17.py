@@ -28,7 +28,7 @@ pairs = ['cs-en', 'de-en', 'fi-en', 'lv-en', 'ru-en', 'tr-en', 'zh-en']
 
 def get_tokenizer():
     if not os.path.exists(tokenizer_path):
-        from GenericTools.stay_organized.download_utils import download_and_unzip
+        from pyaromatics.stay_organized.download_utils import download_and_unzip
         import shutil
         if len(os.listdir(WKT103DIR)) == 0:
             download_and_unzip(data_links, WKT103DIR)

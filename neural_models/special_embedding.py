@@ -1,5 +1,5 @@
 import tensorflow as tf
-from GenericTools.stay_organized.utils import str2val
+from pyaromatics.stay_organized.utils import str2val
 from anthe_official.neural_models.tensor_chain.convolutions import TCConv1D
 
 from anthe_official.neural_models.tensor_chain.embedding import TCEmbedding

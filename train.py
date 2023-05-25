@@ -4,9 +4,9 @@ import os, argparse, random, socket, time, json, shutil, sys
     
 sys.path.append('../')
         
-from GenericTools.keras_tools.esoteric_callbacks.several_validations import MultipleValidationSets
-from GenericTools.keras_tools.model_checkpoint import CustomModelCheckpoint
-from GenericTools.keras_tools.silence_tensorflow import silence_tf
+from pyaromatics.keras_tools.esoteric_callbacks.several_validations import MultipleValidationSets
+from pyaromatics.keras_tools.model_checkpoint import CustomModelCheckpoint
+from pyaromatics.keras_tools.silence_tensorflow import silence_tf
 
 silence_tf()
 
@@ -14,11 +14,11 @@ silence_tf()
 import numpy as np
 import pandas as pd
 
-from GenericTools.keras_tools.esoteric_callbacks import LearningRateLogger, TimeStopping, CSVLogger
-from GenericTools.keras_tools.esoteric_losses import sparse_perplexity
-from GenericTools.keras_tools.plot_tools import plot_history
-from GenericTools.stay_organized.utils import NumpyEncoder, str2val
-from GenericTools.keras_tools.esoteric_callbacks import ClearMemory
+from pyaromatics.keras_tools.esoteric_callbacks import LearningRateLogger, TimeStopping, CSVLogger
+from pyaromatics.keras_tools.esoteric_losses import sparse_perplexity
+from pyaromatics.keras_tools.plot_tools import plot_history
+from pyaromatics.stay_organized.utils import NumpyEncoder, str2val
+from pyaromatics.keras_tools.esoteric_callbacks import ClearMemory
 from filmformer.generation_data.data_loader import WMT_ENDE
 from filmformer.generation_data.wmt17 import WMT17
 from filmformer.neural_models.transformer import build_model
