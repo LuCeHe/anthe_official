@@ -24,11 +24,11 @@ from anthe_official.neural_models.tensor_chain.base_conv import Conv
 
 class TCConv(Conv):
 
-    def __init__(self, rank, filters, kernel_size, mpo_length=3, bond=None, ratio=None, **kwargs):
+    def __init__(self, rank, filters, kernel_size, tc_length=3, bond=None, ratio=None, **kwargs):
         super().__init__(rank, filters, kernel_size, **kwargs)
         self._bond = bond
         self._ratio = ratio
-        self._mpo_length = mpo_length
+        self._tc_length = tc_length
 
     def _validate_init(self):
         if self.filters is not None and self.filters % self.groups != 0:
@@ -110,7 +110,7 @@ class TCConv(Conv):
         for i in range(self.filters):
             # print(self._name + "_"+str(i))
             var = get_tc_kernel(self, self.kernel_size[0], (input_channel // self.groups), 
-                                 self._mpo_length, self._bond, self._ratio, self._name + "_"+str(i),
+                                 self._tc_length, self._bond, self._ratio, self._name + "_"+str(i),
                    self.kernel_initializer, self.kernel_regularizer, self.kernel_constraint)
             #kernels = []
             #kernels.append(self.add_weight("kernel_0%d" % (i),
@@ -155,7 +155,7 @@ class TCConv(Conv):
         config = {
             "bond": self._bond,
             "ratio": self._ratio,
-            "mpo_length": self._mpo_length,
+            "tc_length": self._tc_length,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

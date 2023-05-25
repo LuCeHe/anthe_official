@@ -57,15 +57,15 @@ class MultiHeadAttention(tf.keras.layers.Layer):
             dense = tf.keras.layers.Dense(d_model)
             w_query, w_key, w_value = [dense] * 3
 
-        elif 'mpolayer' in comments or 'tcpreatt' in comments:
-            mpor = str2val(comments, 'tcpreatt', float, default=.2)
-            mpor = str2val(comments, 'mpolayer', float, default=mpor)
+        elif 'tclayer' in comments or 'tcpreatt' in comments:
+            tcr = str2val(comments, 'tcpreatt', float, default=.2)
+            tcr = str2val(comments, 'tclayer', float, default=tcr)
             tclength = str2val(comments, 'tclength', int, default=3)
-            tclength = str2val(comments, 'mpolayerlength', int, default=tclength)
+            tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
-            w_query = TCDense(d_model, length=tclength, ratio=mpor)
-            w_key = TCDense(d_model, length=tclength, ratio=mpor)
-            w_value = TCDense(d_model, length=tclength, ratio=mpor)
+            w_query = TCDense(d_model, length=tclength, ratio=tcr)
+            w_key = TCDense(d_model, length=tclength, ratio=tcr)
+            w_value = TCDense(d_model, length=tclength, ratio=tcr)
 
         else:
             w_query = tf.keras.layers.Dense(d_model)

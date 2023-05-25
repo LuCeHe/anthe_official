@@ -18,12 +18,12 @@ from anthe_official.neural_models.tensor_chain.utils import get_tc_kernel
 
 
 class TCDense(tf.keras.layers.Dense):
-    def __init__(self, units, length=3, bond=None, ratio=None, **kwargs):
+    def __init__(self, units, tc_length=3, bond=None, ratio=None, **kwargs):
         super().__init__(units, **kwargs)
 
         self._bond = bond
         self._ratio = ratio
-        self._length = int(length)
+        self._length = int(tc_length)
 
         self.supports_masking = True
 

@@ -52,7 +52,6 @@ class Transformer:
             for _ in range(decoder_count)
         ]
 
-
         if 'projectoutput' in self.comments:
             self.decoder_embedding_layer.embedding.build((1,))
             embm = tf.transpose(self.decoder_embedding_layer.embedding.embeddings)
@@ -61,10 +60,10 @@ class Transformer:
             # self.output_projection = lambda x: self.decoder_embedding_layer(x, mode='projection')
 
         elif 'mpolastlayer' in self.comments:
-            mpor = str2val(comments, 'mpolastlayer', float, default=.2)
+            tcr = str2val(comments, 'mpolastlayer', float, default=.2)
             tclength = str2val(comments, 'tclength', int, default=3)
             tclength = str2val(comments, 'mpolastlayerlength', int, default=tclength)
-            self.output_projection = TCDense(target_vocab_size, length=tclength, ratio=mpor)
+            self.output_projection = TCDense(target_vocab_size, length=tclength, ratio=tcr)
 
         else:
             self.output_projection = tf.keras.layers.Dense(target_vocab_size)
@@ -84,8 +83,13 @@ class Transformer:
             decoder_tensor, _, _ = self.decoder_layers[i](decoder_tensor, encoder_tensor, look_ahead_mask,
                                                           target_padding_mask)
 
-
         return self.output_projection(decoder_tensor)
+
+
+Anthe = lambda *args, **kwargs: Transformer(
+    *args, **kwargs,
+    comments='geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2'
+)
 
 
 class EncoderLayer(tf.keras.layers.Layer):
@@ -125,6 +129,13 @@ class EncoderLayer(tf.keras.layers.Layer):
         output = self.layer_norm_2(tf.add(output_temp, output))  # correct
 
         return output, attention
+
+
+AntheEncoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob: \
+    EncoderLayer(
+        attention_head_count, d_model, d_point_wise_ff, dropout_prob,
+        comments='geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2'
+    )
 
 
 class DecoderLayer(tf.keras.layers.Layer):
@@ -177,23 +188,29 @@ class DecoderLayer(tf.keras.layers.Layer):
         return output, attention_1, attention_2
 
 
+AntheDecoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob: \
+    EncoderLayer(
+        attention_head_count, d_model, d_point_wise_ff, dropout_prob,
+        comments='geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2'
+    )
+
+
 class PositionWiseFeedForwardLayer(tf.keras.layers.Layer):
     def __init__(self, d_point_wise_ff, d_model, comments=''):
         super(PositionWiseFeedForwardLayer, self).__init__()
-
 
         if 'noffn' in comments:
             self.w_1 = lambda x: x
             self.w_2 = lambda x: x
 
-        elif 'mpolayer' in comments or 'tcffn' in comments:
-            mpor = str2val(comments, 'tcffn', float, default=.2)
-            mpor = str2val(comments, 'mpolayer', float, default=mpor)
+        elif 'tclayer' in comments or 'tcffn' in comments:
+            tcr = str2val(comments, 'tcffn', float, default=.2)
+            tcr = str2val(comments, 'tclayer', float, default=tcr)
             tclength = str2val(comments, 'tclength', int, default=3)
-            tclength = str2val(comments, 'mpolayerlength', int, default=tclength)
+            tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
-            self.w_1 = TCDense(d_point_wise_ff, length=tclength, ratio=mpor)
-            self.w_2 = TCDense(d_model, length=tclength, ratio=mpor)
+            self.w_1 = TCDense(d_point_wise_ff, length=tclength, ratio=tcr)
+            self.w_2 = TCDense(d_model, length=tclength, ratio=tcr)
         else:
             self.w_1 = tf.keras.layers.Dense(d_point_wise_ff)
             self.w_2 = tf.keras.layers.Dense(d_model)
@@ -216,11 +233,11 @@ class GEGLU(tf.keras.layers.Layer):
             self.w_3 = lambda x: x
             self.w_2 = lambda x: x
 
-        elif 'mpolayer' in comments or 'tcffn' in comments:
-            mpor = str2val(comments, 'tcffn', float, default=.2)
-            mpor = str2val(comments, 'mpolayer', float, default=mpor)
+        elif 'tclayer' in comments or 'tcffn' in comments:
+            tcr = str2val(comments, 'tcffn', float, default=.2)
+            tcr = str2val(comments, 'tclayer', float, default=mpor)
             tclength = str2val(comments, 'tclength', int, default=3)
-            tclength = str2val(comments, 'mpolayerlength', int, default=tclength)
+            tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
             self.w_1 = TCDense(d_point_wise_ff, length=tclength, ratio=mpor)
             self.w_3 = TCDense(d_point_wise_ff, length=tclength, ratio=mpor)
@@ -233,15 +250,11 @@ class GEGLU(tf.keras.layers.Layer):
         swish = lambda x: x * tf.nn.sigmoid(x)
         self.activation = swish
 
-
     def call(self, inputs):
         x1 = self.w_1(inputs)
         x3 = self.w_3(inputs)
         x2 = self.activation(x1) * x3
         return self.w_2(x2)
-
-
-
 
 
 def build_model(

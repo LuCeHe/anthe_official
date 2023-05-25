@@ -20,12 +20,12 @@ from anthe_official.neural_models.tensor_chain.utils import get_tc_kernel
 
 
 class TCEmbedding(tf.keras.layers.Embedding):
-    def __init__(self, input_dim, output_dim, mpo_length=3, bond=None, ratio=None, **kwargs):
+    def __init__(self, input_dim, output_dim, tc_length=3, bond=None, ratio=None, **kwargs):
         super().__init__(input_dim, output_dim, **kwargs)
 
         self._input_size = int(input_dim)
         self._output_size = int(output_dim)
-        self._length = int(mpo_length)
+        self._length = int(tc_length)
         self._bond = bond
         self._ratio = ratio
 
