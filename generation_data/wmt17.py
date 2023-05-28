@@ -136,6 +136,7 @@ class WMT17(tf.keras.utils.Sequence):
 
         self.maxlen = maxlen
         self.epochs = 50 if epochs == None else epochs
+        self.comments = comments
 
         WMTDIR = os.path.join(DATADIR, language_pair)
         self.preprocessed_data_path = os.path.join(WMTDIR, language_pair)
@@ -157,6 +158,14 @@ class WMT17(tf.keras.utils.Sequence):
         self.steps_per_epoch = int(n_samples / self.batch_size) - 1 \
             if self.steps_per_epoch < 0 else self.steps_per_epoch
 
+        if 'pytorch' in comments:
+            import torch
+
+            self.pkg = torch
+        else:
+            import tensorflow as tf
+
+            self.pkg = tf
     def get_fraction_of_dataset(self, index):
 
         if (index * self.batch_size) % self.RAM_samples == 0:
@@ -185,18 +194,34 @@ class WMT17(tf.keras.utils.Sequence):
             target = np.random.choice(3, (self.batch_size, self.seq_max_len_target))
 
         if len(target.shape) == 1:
-            target = tf.keras.utils.pad_sequences(target.tolist(), padding='post', dtype="float32")
+            if 'pytorch' in self.comments:
+                target = self.pkg.nn.functional.pad_sequence(target, padding_value=0, batch_first=True)
+            else:
+                target = self.pkg.keras.utils.pad_sequences(target.tolist(), padding='post', dtype="float32")
 
         if len(inputs.shape) == 1:
-            inputs = tf.keras.utils.pad_sequences(inputs.tolist(), padding='post', dtype="float32")
+            if 'pytorch' in self.comments:
+                inputs = self.pkg.nn.functional.pad_sequence(inputs, padding_value=0, batch_first=True)
+            else:
+                inputs = self.pkg.keras.utils.pad_sequences(inputs.tolist(), padding='post', dtype="float32")
 
         if not inputs.shape[1] + 1 == target.shape[1]:
             if inputs.shape[1] + 1 > target.shape[1]:
                 l = inputs.shape[1] + 1
-                target = tf.keras.utils.pad_sequences(target.tolist(), padding='post', dtype="float32", maxlen=l)
+
+                if 'pytorch' in self.comments:
+                    target = self.pkg.nn.functional.pad_sequence(target, padding_value=0, batch_first=True,
+                                                                  maxlen=l)
+                else:
+                    target = self.pkg.keras.utils.pad_sequences(target.tolist(), padding='post', dtype="float32",
+                                                                 maxlen=l)
             else:
                 l = target.shape[1] - 1
-                inputs = tf.keras.utils.pad_sequences(inputs.tolist(), padding='post', dtype="float32", maxlen=l)
+                if 'pytorch' in self.comments:
+                    inputs = self.pkg.nn.functional.pad_sequence(inputs, padding_value=0, batch_first=True, maxlen=l)
+                else:
+                    inputs = self.pkg.keras.utils.pad_sequences(inputs.tolist(), padding='post', dtype="float32",
+                                                                 maxlen=l)
 
         if inputs.shape[1] > self.maxlen:
             inputs = inputs[:, :self.maxlen]

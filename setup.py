@@ -13,7 +13,7 @@ requirements = [
     'tqdm>=4.64.0',
     'pyaromatics==0.0.2',
 ]
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 setup(
     name='anthe_official',
