@@ -14,7 +14,7 @@ import tensorflow as tf
 
 from tensorflow.keras import backend
 
-from anthe_official.neural_models.tensor_chain.utils import get_tc_kernel
+from anthe_official.neural_models_tf.tensor_chain.utils import get_tc_kernel
 
 
 class TCDense(tf.keras.layers.Dense):

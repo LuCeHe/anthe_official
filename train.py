@@ -18,9 +18,9 @@ from pyaromatics.keras_tools.esoteric_losses import sparse_perplexity
 from pyaromatics.keras_tools.plot_tools import plot_history
 from pyaromatics.stay_organized.utils import NumpyEncoder, str2val
 from pyaromatics.keras_tools.esoteric_callbacks import ClearMemory
-from filmformer.generation_data.data_loader import WMT_ENDE
-from filmformer.generation_data.wmt17 import WMT17
-from filmformer.neural_models.transformer import build_model
+from anthe_official.generation_data.data_loader import WMT_ENDE
+from anthe_official.generation_data.wmt17 import WMT17
+from anthe_official.neural_models_tf.transformer import build_model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -41,7 +41,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--comments",
-        default='',
+        default='layerhspos:2',
         type=str, help="String to activate extra behaviors")
     parser.add_argument("--seed", default=39, type=int, help="Random seed")
     parser.add_argument("--epochs", default=3, type=int, help="Epochs")

@@ -3,10 +3,10 @@ import os
 import tensorflow as tf
 
 from pyaromatics.stay_organized.utils import str2val
-from anthe_official.neural_models.attentions import MultiHeadAttention
-from anthe_official.neural_models.helper_layers import ProjectionLayer
-from anthe_official.neural_models.tensor_chain.dense import TCDense
-from anthe_official.neural_models.special_embedding import select_embedding_type
+from anthe_official.neural_models_tf.attentions import MultiHeadAttention
+from anthe_official.neural_models_tf.helper_layers import ProjectionLayer
+from anthe_official.neural_models_tf.tensor_chain.dense import TCDense
+from anthe_official.neural_models_tf.special_embedding import select_embedding_type
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -169,7 +169,6 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.dropout_3 = tf.keras.layers.Dropout(dropout_prob)
         self.layer_norm_3 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
-        self.last_op = lambda x, y: x + y if 'skipwithin' in comments else x
 
     def call(self, decoder_inputs, encoder_output, look_ahead_mask, padding_mask):
         output, attention_1 = self.attention([decoder_inputs, decoder_inputs, decoder_inputs, look_ahead_mask])
@@ -182,8 +181,6 @@ class DecoderLayer(tf.keras.layers.Layer):
         output = self.position_wise_feed_forward_layer(encoder_decoder_attention_output)
         output = self.dropout_3(output)
         output = self.layer_norm_3(tf.add(encoder_decoder_attention_output, output))  # residual network
-
-        output = self.last_op(output, decoder_inputs)
 
         return output, attention_1, attention_2
 

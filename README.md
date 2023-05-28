@@ -19,7 +19,7 @@ The following layers are available for the Anthe architecture, only in TensorFlo
 You can access the Anthe architecture, the AntheEncoderBlock and the AntheDecoderBlock, like so:
 
 ```python
-from anthe_official import Anthe, AntheEncoderBlock, AntheDecoderBlock
+from anthe_official.neural_models_tf import Anthe, AntheEncoderBlock, AntheDecoderBlock
 
 model = Anthe(
     inputs_vocab_size, target_vocab_size, encoder_count, decoder_count, attention_head_count,
@@ -41,7 +41,7 @@ The TC versions of the Dense, Conv1D and Embedding,
 and the SoftPOS and the HSoftPOS, can be accessed like so:
 
 ```python
-from anthe_official import *
+from anthe_official.neural_models_tf import *
 
 tc_dense = TCDense(d_model, length=3, ratio=.2)
 tc_conv1d = TCConv1D(filters, kernel_size, tc_length=3, ratio=.2)

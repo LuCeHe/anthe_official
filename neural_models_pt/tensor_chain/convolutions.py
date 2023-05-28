@@ -18,8 +18,8 @@ from keras import initializers
 from keras import regularizers
 from keras.engine.input_spec import InputSpec
 
-from anthe_official.neural_models.tensor_chain.utils import get_tc_kernel
-from anthe_official.neural_models.tensor_chain.base_conv import Conv
+from anthe_official.neural_models_tf.tensor_chain.utils import get_tc_kernel
+from anthe_official.neural_models_tf.tensor_chain.base_conv import Conv
 
 
 class TCConv(Conv):

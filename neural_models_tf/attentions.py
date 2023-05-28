@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from pyaromatics.stay_organized.utils import str2val
-from anthe_official.neural_models.tensor_chain.dense import TCDense
+from anthe_official.neural_models_tf.tensor_chain.dense import TCDense
 
 
 class ScaledDotProductAttention(tf.keras.layers.Layer):
@@ -76,7 +76,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.w_key = w_key
         self.w_value = w_value
 
-        self.scaled_dot_product = ScaledDotProductAttention(self.d_h, comments)
+        self.scaled_dot_product = ScaledDotProductAttention(self.d_h)
         self.ff = tf.keras.layers.Dense(d_model)
 
         self.d_model = d_model

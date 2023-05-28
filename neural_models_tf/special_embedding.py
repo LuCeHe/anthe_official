@@ -1,8 +1,8 @@
 import tensorflow as tf
 from pyaromatics.stay_organized.utils import str2val
-from anthe_official.neural_models.tensor_chain.convolutions import TCConv1D
+from anthe_official.neural_models_tf.tensor_chain.convolutions import TCConv1D
 
-from anthe_official.neural_models.tensor_chain.embedding import TCEmbedding
+from anthe_official.neural_models_tf.tensor_chain.embedding import TCEmbedding
 
 
 def positional_encoding(max_len, d_model):
@@ -27,7 +27,7 @@ def angle(pos, index, d_model):
     return pos / tf.pow(10000., tf.cast((index - index % 2) / d_model, tf.float32))
 
 
-class Embeddinglayer(tf.keras.layers.Layer):
+class EmbeddingLayer(tf.keras.layers.Layer):
     def __init__(self, vocab_size, d_model, **kwargs):
         # model hyper parameter variables
         super().__init__(**kwargs)
@@ -48,14 +48,6 @@ class Embeddinglayer(tf.keras.layers.Layer):
         return output
 
 
-def positional_emb(emb, max_sequence_len, d_model):
-    # max_sequence_len = sequences.shape[1]
-    output = emb * tf.sqrt(tf.cast(d_model, dtype=tf.float32))
-    output += positional_encoding(max_sequence_len, d_model)
-
-    return output
-
-
 class SoftPOS(tf.keras.layers.Layer):
     def __init__(self, add_units, n_subpos=3, repeat_subpos=2, initializer='orthogonal', **kwargs):
         super().__init__(**kwargs)
@@ -70,7 +62,7 @@ class SoftPOS(tf.keras.layers.Layer):
             self.spos = []
             for i in range(self.repeat_subpos):
                 spos = self.add_weight(
-                    f"spos_{i}", shape=[self.n_subpos, self.units], dtype="float32",
+                    f"spos_{i}", shape=[self.n_subpos, self.add_units], dtype="float32",
                     initializer=self.initializer
                 )
                 self.spos.append(spos)
@@ -97,29 +89,31 @@ class SoftPOS(tf.keras.layers.Layer):
 
 
 class HSoftPOS(tf.keras.layers.Layer):
-    def __init__(self, vocab_size, embed_dim, n_layers=2, tcemb=False, tcconv=False, tcr=.2, tclength=2, **kwargs):
+    def __init__(self, vocab_size, embed_dim, n_layers=2, tcembr=None, tcconvr=None, tclength=2, **kwargs):
         super().__init__(**kwargs)
+
+        assert tcembr is None or isinstance(tcembr, float)
+        assert tcconvr is None or isinstance(tcconvr, float)
 
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
         self.n_layers = n_layers
-        self.tcemb = tcemb
-        self.tcconv = tcconv
-        self.tcr = tcr
+        self.tcembr = tcembr
+        self.tcconvr = tcconvr
         self.tclength = tclength
 
         local_d = int(embed_dim / 2 / n_layers)
         embd_d = embed_dim - local_d * (2 * n_layers - 1)
 
-        if not tcemb:
-            self.emb = Embeddinglayer(vocab_size, embd_d)
+        if tcembr is None:
+            self.emb = EmbeddingLayer(vocab_size, embd_d)
         else:
-            self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcr, tc_length=tclength)
+            self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcembr, tc_length=tclength)
 
-        if tcconv:
-            conv1d = lambda *args, **kwargs: TCConv1D(*args, **kwargs, ratio=tcr, tc_length=tclength)
-        else:
+        if tcconvr is None:
             conv1d = tf.keras.layers.Conv1D
+        else:
+            conv1d = lambda *args, **kwargs: TCConv1D(*args, **kwargs, ratio=tcconvr, tc_length=tclength)
 
         self.spos, self.convs = [], []
         for i in range(n_layers):
@@ -135,7 +129,7 @@ class HSoftPOS(tf.keras.layers.Layer):
             xs.append(x)
 
         ys = []
-        for x, spos in zip(xs, self.sposs):
+        for x, spos in zip(xs, self.spos):
             y = spos(x)
             ys.append(y)
 
@@ -149,9 +143,8 @@ class HSoftPOS(tf.keras.layers.Layer):
             'vocab_size': self.vocab_size,
             'embed_dim': self.embed_dim,
             'n_layers': self.n_layers,
-            'tcemb': self.tcemb,
-            'tcconv': self.tcconv,
-            'tcr': self.tcr,
+            'tcembr': self.tcembr,
+            'tcconvr': self.tcconvr,
             'tclength': self.tclength,
         }
 
@@ -161,7 +154,7 @@ class HSoftPOS(tf.keras.layers.Layer):
 
 def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, d_model):
     if not 'tcemb' in comments:
-        emb = lambda vocab, embd: Embeddinglayer(vocab, embd)
+        emb = lambda vocab, embd: EmbeddingLayer(vocab, embd)
     else:
         tclength = str2val(comments, 'tclength', int, default=3)
         tcr = str2val(comments, 'tcemb', float, default=.2)
@@ -174,8 +167,8 @@ def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, 
         embd_d = d_model - local_d * (2 * n - 1)
 
         if not 'tcemb' in comments:
-            eemb = Embeddinglayer(inputs_vocab_size, embd_d)
-            demb = Embeddinglayer(target_vocab_size, embd_d)
+            eemb = EmbeddingLayer(inputs_vocab_size, embd_d)
+            demb = EmbeddingLayer(target_vocab_size, embd_d)
         else:
             tcr = str2val(comments, 'tcemb', float, default=.2)
 
@@ -227,6 +220,25 @@ def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, 
 
         self.encoder_embedding_layer = lambda x, mode='embedding': code(x, eemb, econvs, espos, mode)
         self.decoder_embedding_layer = lambda x, mode='embedding': code(x, demb, dconvs, dspos, mode)
+
+    elif 'layerhspos' in comments:
+        print('nice!')
+        n = str2val(comments, 'layerhspos', output_type=int, default=3)
+
+        tclength = str2val(comments, 'tclength', int, default=2)
+        tcembr, tcconvr = None, None
+        if 'tcemb' in comments:
+            tcembr = str2val(comments, 'tcemb', float, default=.2)
+
+        if 'tcconv' in comments:
+            tcconvr = str2val(comments, 'tcconv', float, default=.2)
+
+        self.encoder_embedding_layer = HSoftPOS(
+            inputs_vocab_size, d_model, n_layers=n, tcembr=tcembr, tcconvr=tcconvr, tclength=tclength
+        )
+        self.decoder_embedding_layer = HSoftPOS(
+            target_vocab_size, d_model, n_layers=n, tcembr=tcembr, tcconvr=tcconvr, tclength=tclength
+        )
     else:
         self.encoder_embedding_layer = emb(inputs_vocab_size, d_model)
         self.decoder_embedding_layer = emb(inputs_vocab_size, d_model)

@@ -16,7 +16,7 @@
 
 import tensorflow as tf
 
-from anthe_official.neural_models.tensor_chain.utils import get_tc_kernel
+from anthe_official.neural_models_tf.tensor_chain.utils import get_tc_kernel
 
 
 class TCEmbedding(tf.keras.layers.Embedding):
