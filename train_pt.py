@@ -1,14 +1,19 @@
 from __future__ import (absolute_import, division, print_function, unicode_literals)
-import tensorflow as tf
+# import tensorflow as tf
+import torch
+import torch.optim as optim
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
 import os, argparse, random, socket, time, json, shutil, sys
 
 sys.path.append('../')
 
 from pyaromatics.keras_tools.esoteric_callbacks.several_validations import MultipleValidationSets
 from pyaromatics.keras_tools.model_checkpoint import CustomModelCheckpoint
-from pyaromatics.keras_tools.silence_tensorflow import silence_tf
+# from pyaromatics.keras_tools.silence_tensorflow import silence_tf
 
-silence_tf()
+# silence_tf()
 
 import numpy as np
 import pandas as pd
@@ -71,6 +76,32 @@ def get_args():
     return args
 
 
+def evaluate(model, data_loader, criterion, device):
+    model.eval()
+
+    total_loss = 0.0
+    total_correct = 0
+    total_processed = 0
+
+    with torch.no_grad():
+        for inputs, targets in data_loader:
+            inputs = inputs.to(device)
+            targets = targets.to(device)
+
+            outputs = model(inputs)
+
+            loss = criterion(outputs, targets)
+
+            total_loss += loss.item() * inputs.size(0)
+            total_correct += (outputs.argmax(dim=1) == targets).sum().item()
+            total_processed += inputs.size(0)
+
+    model.train()
+
+    val_loss = total_loss / total_processed
+    val_accuracy = total_correct / total_processed
+
+    return val_loss, val_accuracy
 def main(args):
     comments = args.comments
     results = vars(args)
@@ -87,7 +118,8 @@ def main(args):
     # set seed
     random.seed(args.seed)
     np.random.seed(args.seed)
-    tf.random.set_seed(args.seed)
+    # tf.random.set_seed(args.seed)
+    torch.manual_seed(args.seed)
 
     # hyper paramaters
     nlayers = str2val(args.comments, 'nlayers', int, default=6)
@@ -155,71 +187,47 @@ def main(args):
     print(json.dumps(results, indent=4, cls=NumpyEncoder))
 
     learning_rate = str2val(args.comments, 'lr', float, default=3.16e-5)
-    optimizer = tf.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 
-    eager = True if 'eager' in comments else False
-    model.compile(
-        loss=tf.losses.SparseCategoricalCrossentropy(from_logits=True),
-        optimizer=optimizer,
-        metrics=[
-            'sparse_categorical_accuracy', tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-            sparse_perplexity
-        ],
-        run_eagerly=eager)
-    callbacks = [
-        LearningRateLogger(),
-        ClearMemory(batch_frequency=batch_frequency, verbose=0),
-        TimeStopping(args.stop_time, 1, stop_within_epoch=True),
-        tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
-    ]
-    if args.save_best > 0:
-        model_checkpoint_best = CustomModelCheckpoint(
-            filepath=ckpt_best_dir + '/' + 'best_model.h5',
-            save_weights_only=True,
-            monitor='val_loss',
-            # 'val_sparse_perplexity', 'val_sparse_categorical_accuracy' 'val_sparse_categorical_crossentropy'
-            mode='min',
-            save_best_only=True,
-            verbose=0)
-        callbacks.append(model_checkpoint_best)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.98), eps=1e-9)
+    criterion = nn.CrossEntropyLoss()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if args.checkpoint_period > 0:
-        model_checkpoint = CustomModelCheckpoint(
-            filepath=ckpt_dir + '/' + 'last_model.h5',
-            save_weights_only=False,
-            save_best_only=False,
-            verbose=0,
-            save_freq="period", period=args.checkpoint_period)
-        callbacks.append(model_checkpoint)
+    model.to(device)
+    model.train()
 
-    history_path = os.path.join(experiment_dir, 'history.csv')
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
 
-    if 'lpair' in comments:
-        callbacks.append(MultipleValidationSets({'t': gen_test}, verbose=1), )
+    for epoch in range(args.epochs):
+        total_loss = 0.0
+        total_correct = 0
+        total_processed = 0
 
-    callbacks.append(CSVLogger(history_path), )
-    # notice that the wmt dataloader does not work with shuffle=True
-    shuffle = False if 'lpair' in comments else True
-    model.fit(gen_train, validation_data=gen_val, callbacks=callbacks, epochs=args.epochs, shuffle=shuffle)
+        for inputs, targets in train_loader:
+            inputs = inputs.to(device)
+            targets = targets.to(device)
 
-    if args.epochs > 0:
-        history_df = pd.read_csv(history_path)
+            optimizer.zero_grad()
 
-        history_dict = {k: history_df[k].tolist() for k in history_df.columns.tolist()}
-        json_filename = os.path.join(experiment_dir, 'history.json')
-        history_jsonable = {k: np.array(v).astype(float).tolist() for k, v in history_dict.items()}
-        json.dump(history_jsonable, open(json_filename, "w"))
+            outputs = model(inputs)
 
-        history_keys = history_df.columns.tolist()
-        lengh_keys = 6
-        no_vals_keys = [k for k in history_keys if not k.startswith('val_')]
-        all_chunks = [no_vals_keys[x:x + lengh_keys] for x in range(0, len(no_vals_keys), lengh_keys)]
-        for i, subkeys in enumerate(all_chunks):
-            history_dict = {k: history_df[k].tolist() for k in subkeys}
-            history_dict.update(
-                {'val_' + k: history_df['val_' + k].tolist() for k in subkeys if 'val_' + k in history_keys})
-            plot_filename = os.path.join(experiment_dir, f'history_{i}.png')
-            plot_history(histories=history_dict, plot_filename=plot_filename, epochs=args.epochs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+
+            optimizer.step()
+
+            total_loss += loss.item() * inputs.size(0)
+            total_correct += (outputs.argmax(dim=1) == targets).sum().item()
+            total_processed += inputs.size(0)
+
+        train_loss = total_loss / total_processed
+        train_accuracy = total_correct / total_processed
+
+        val_loss, val_accuracy = evaluate(model, val_loader, criterion, device)
+
+        print(
+            f"Epoch {epoch + 1}/{args.epochs}: Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
+
 
     print('Evaluating on validation and test set...')
     for data_split in ['validation', 'test']:
