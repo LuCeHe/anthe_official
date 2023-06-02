@@ -67,6 +67,8 @@ class SoftPOS(tf.keras.layers.Layer):
                 )
                 self.spos.append(spos)
 
+        self.built = True
+
     def call(self, inputs):
         x = inputs
         emb = x

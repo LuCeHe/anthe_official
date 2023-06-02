@@ -38,7 +38,7 @@ class EmbeddingLayer(nn.Module):
         self.embedding = nn.Embedding(vocab_size, d_model)
 
     def forward(self, sequences):
-        max_sequence_len = sequences.size(1)
+        max_sequence_len = sequences.shape[1]
 
         output = self.embedding(sequences)
         output = output * torch.sqrt(torch.tensor(self.d_model, dtype=torch.float32))
@@ -59,16 +59,20 @@ class SoftPOS(nn.Module):
         self.initializer = initializer
 
         if self.n_subpos > 0:
-            self.spos = nn.Parameter(torch.Tensor(self.repeat_subpos, self.n_subpos, self.add_units))
-            nn.init.orthogonal_(self.spos)
+            self.spos = []
+            for i in range(self.repeat_subpos):
+                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units))
+                nn.init.orthogonal_(spos)
+
+                self.spos.append(spos)
 
     def forward(self, inputs):
         x = inputs
         emb = x
         if self.n_subpos > 0:
-            for i in range(self.repeat_subpos):
+            for i, spos in enumerate(self.spos):
                 spos_select = F.softmax(emb[..., i * self.n_subpos:(i + 1) * self.n_subpos], dim=-1)
-                _spos = torch.matmul(spos_select, self.spos[i])
+                _spos = torch.matmul(spos_select, spos)
                 x = torch.cat([x, _spos], dim=-1)
 
         return x
@@ -105,7 +109,7 @@ class HSoftPOS(nn.Module):
         for i in range(n_layers):
             self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1))
             if i < n_layers - 1:
-                self.convs.append(conv1d(local_d, local_d * 3, padding=2 ** i, dilation=2 ** i))
+                self.convs.append(conv1d(embd_d if i == 0 else local_d, local_d, 3, padding=2 ** i, dilation=2 ** i))
 
     def forward(self, inputs):
         x = self.emb(inputs)
