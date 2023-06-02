@@ -16,6 +16,7 @@ vocab_size = 100
 d_model = 4
 max_sequence_len = 6
 batch_size = 2
+dilation = 4 # works for 1 and 2, make it work for more
 
 check_embeddings = False
 check_softpos = False
@@ -57,7 +58,6 @@ if check_softpos:
     spos_matrices_pt = softpos_layer_pt.spos
 
     # use it in TF
-    print('here!')
     softpos_layer_tf.build((batch_size, max_sequence_len, d_model))
     for i in range(len(spos_matrices_pt)):
         spos_pt = softpos_layer_pt.spos[i].detach().numpy()
@@ -77,10 +77,11 @@ if check_softpos:
 if check_conv:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
 
-    conv1d_pt = torch.nn.Conv1d(in_channels=d_model, out_channels=d_model // 2, kernel_size=4, stride=1, padding=2)
-    conv1d_tf = tf.keras.layers.Conv1D(filters=d_model // 2, kernel_size=4, strides=1, padding='same')
+    conv1d_pt = torch.nn.Conv1d(in_channels=d_model, out_channels=d_model // 2, kernel_size=4, stride=1, padding=0,
+                                dilation=dilation)
+    conv1d_tf = tf.keras.layers.Conv1D(filters=d_model // 2, kernel_size=4, strides=1, padding='same',
+                                       dilation_rate=dilation)
     output_tf = conv1d_tf(input_tensor)
-    print(output_tf.shape)
 
     conv_weight_pt = conv1d_pt.weight.detach().numpy()
     conv_bias_pt = conv1d_pt.bias.detach().numpy()
@@ -91,22 +92,25 @@ if check_conv:
 
     conv1d_tf.kernel.assign(conv_weight_pt)
     conv1d_tf.bias.assign(conv_bias_pt)
-    conv_weight_tf = conv1d_tf.kernel.numpy()
-    conv_bias_tf = conv1d_tf.bias.numpy()
+    # conv_weight_tf = conv1d_tf.kernel.numpy()
+    # conv_bias_tf = conv1d_tf.bias.numpy()
 
     # Initialize weights
     output_tf = conv1d_tf(input_tensor)
 
-    print('shape', input_tensor.shape)
     input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
-    print('shape', input_tensor.shape)
-    input_tensor = torch.nn.functional.pad(input_tensor, (0, 1, 0, 0))  # [left, right, top, bot]
-    print('shape', input_tensor.shape)
+    input_tensor = torch.nn.functional.pad(
+        input_tensor, (
+            1 * dilation + dilation - 1, 2 * dilation - (dilation - 1), 0, 0)
+    )
 
     output_pt = conv1d_pt(input_tensor)
+    output_pt = torch.transpose(output_pt, 1, 2)
+
+    print(output_pt)
+    print(output_tf)
 
     print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
-
 
 if check_hsoftpos:
     n_layers = 2
