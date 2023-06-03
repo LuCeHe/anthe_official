@@ -224,13 +224,13 @@ class GEGLU(nn.Module):
 
         elif 'tclayer' in comments or 'tcffn' in comments:
             tcr = str2val(comments, 'tcffn', float, default=.2)
-            tcr = str2val(comments, 'tclayer', float, default=mpor)
+            tcr = str2val(comments, 'tclayer', float, default=tcr)
             tclength = str2val(comments, 'tclength', int, default=3)
             tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
-            self.w_1 = TCDense(d_point_wise_ff, length=tclength, ratio=mpor)
-            self.w_3 = TCDense(d_point_wise_ff, length=tclength, ratio=mpor)
-            self.w_2 = TCDense(d_model, length=tclength, ratio=mpor)
+            self.w_1 = TCDense(d_point_wise_ff, length=tclength, ratio=tcr)
+            self.w_3 = TCDense(d_point_wise_ff, length=tclength, ratio=tcr)
+            self.w_2 = TCDense(d_model, length=tclength, ratio=tcr)
         else:
             self.w_1 = nn.Linear(d_model, d_point_wise_ff)
             self.w_3 = nn.Linear(d_model, d_point_wise_ff)

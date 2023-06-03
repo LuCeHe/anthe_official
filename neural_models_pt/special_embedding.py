@@ -50,13 +50,17 @@ class EmbeddingLayer(nn.Module):
 
 
 class SoftPOS(nn.Module):
-    def __init__(self, add_units, n_subpos=3, repeat_subpos=2, initializer='orthogonal'):
+    def __init__(self, add_units, n_subpos=3, repeat_subpos=2, initializer='orthogonal', extend_axis=-1):
         super(SoftPOS, self).__init__()
 
         self.add_units = add_units
         self.n_subpos = n_subpos
         self.repeat_subpos = repeat_subpos
         self.initializer = initializer
+        self.extend_axis = extend_axis
+
+        if not extend_axis in [1, -1]:
+            raise ValueError('extend_axis must be -1 or 1')
 
         if self.n_subpos > 0:
             self.spos = []
@@ -71,9 +75,19 @@ class SoftPOS(nn.Module):
         emb = x
         if self.n_subpos > 0:
             for i, spos in enumerate(self.spos):
-                spos_select = F.softmax(emb[..., i * self.n_subpos:(i + 1) * self.n_subpos], dim=-1)
-                _spos = torch.matmul(spos_select, spos)
-                x = torch.cat([x, _spos], dim=-1)
+                if self.extend_axis == -1:
+                    m = emb[..., i * self.n_subpos:(i + 1) * self.n_subpos]
+                    einsum_string = 'bij,jk->bik'
+                elif self.extend_axis == 1:
+                    m = emb[:, i * self.n_subpos:(i + 1) * self.n_subpos, :]
+                    einsum_string = 'bji,jk->bki'
+                else:
+                    raise ValueError('extend_axis must be -1 or 1')
+
+                spos_select = F.softmax(m, dim=self.extend_axis)
+                _spos = torch.einsum(einsum_string, spos_select, spos)
+
+                x = torch.cat([x, _spos], dim=self.extend_axis)
 
         return x
 

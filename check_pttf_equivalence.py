@@ -6,6 +6,8 @@ from anthe_official.neural_models_pt import SoftPOS as SoftPOSPT
 from anthe_official.neural_models_tf import SoftPOS as SoftPOSTF
 from anthe_official.neural_models_pt import HSoftPOS as HSoftPOSPT
 from anthe_official.neural_models_tf import HSoftPOS as HSoftPOSTF
+from anthe_official.neural_models_pt import GEGLU as GEGLUPT
+from anthe_official.neural_models_tf import GEGLU as GEGLUTF
 
 import numpy as np
 
@@ -13,17 +15,20 @@ import numpy as np
 torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
-d_model = 4
+d_model = 7
 max_sequence_len = 6
 batch_size = 2
 dilation = 2
 kernel_size = 3
+pt_channel_axis = -1  # 1 or -1
+assert pt_channel_axis in [1, -1]
 
 check_embeddings = False
 check_softpos = False
-check_conv = True
+check_conv = False
+check_geglu = True
+check_ffn = False
 check_hsoftpos = False
-check_geglu = False
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
@@ -51,7 +56,7 @@ if check_embeddings:
 
 if check_softpos:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    softpos_layer_pt = SoftPOSPT(d_model)
+    softpos_layer_pt = SoftPOSPT(d_model, extend_axis=pt_channel_axis)
     softpos_layer_tf = SoftPOSTF(d_model)
 
     # get weights from PT
@@ -62,16 +67,17 @@ if check_softpos:
     softpos_layer_tf.build((batch_size, max_sequence_len, d_model))
     for i in range(len(spos_matrices_pt)):
         spos_pt = softpos_layer_pt.spos[i].detach().numpy()
-        print(spos_pt)
-        # emb_matrix_tf = emb_matrix_pt
-        # embedding_layer_tf.embedding.embeddings.assign(emb_matrix_tf)
         softpos_layer_tf.spos[i].assign(spos_pt)
-        # softpos_layer_tf.spos[i] = spos_pt
-        print(softpos_layer_tf.spos[i])
 
     # Initialize weights
     output_tf = softpos_layer_tf(input_tensor)
-    output_pt = softpos_layer_pt(torch.from_numpy(input_tensor))
+
+    if pt_channel_axis == -1:
+        output_pt = softpos_layer_pt(torch.from_numpy(input_tensor))
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = softpos_layer_pt(input_tensor)
+        output_pt = torch.transpose(output_pt, 1, 2)
 
     print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
@@ -163,5 +169,42 @@ if check_hsoftpos:
     print(output_tf)
     print(output_pt)
     print(output_tf.shape, output_pt.shape)
+
+    print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+
+if check_geglu:
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    geglu_layer_pt = GEGLUPT(4 * d_model, d_model, comments='')
+    geglu_layer_tf = GEGLUTF(4 * d_model, d_model, comments='')
+
+    w1_pt = geglu_layer_pt.w_1.weight.detach().numpy().T
+    w2_pt = geglu_layer_pt.w_2.weight.detach().numpy().T
+    w3_pt = geglu_layer_pt.w_3.weight.detach().numpy().T
+
+    b1_pt = geglu_layer_pt.w_1.bias.detach().numpy().T
+    b2_pt = geglu_layer_pt.w_2.bias.detach().numpy().T
+    b3_pt = geglu_layer_pt.w_3.bias.detach().numpy().T
+
+    geglu_layer_tf.build((batch_size, max_sequence_len, d_model))
+    geglu_layer_tf.w_1.build((batch_size, max_sequence_len, d_model))
+    geglu_layer_tf.w_2.build((batch_size, max_sequence_len, d_model))
+    geglu_layer_tf.w_3.build((batch_size, max_sequence_len, d_model))
+
+    geglu_layer_tf.w_1.kernel.assign(w1_pt)
+    geglu_layer_tf.w_1.bias.assign(b1_pt)
+    geglu_layer_tf.w_2.kernel.assign(w2_pt)
+    geglu_layer_tf.w_2.bias.assign(b2_pt)
+    geglu_layer_tf.w_3.kernel.assign(w3_pt)
+    geglu_layer_tf.w_3.bias.assign(b3_pt)
+
+    # Initialize weights
+    output_tf = geglu_layer_tf(input_tensor)
+
+    if pt_channel_axis == -1:
+        output_pt = geglu_layer_pt(torch.from_numpy(input_tensor))
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = geglu_layer_pt(input_tensor)
+        output_pt = torch.transpose(output_pt, 1, 2)
 
     print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
