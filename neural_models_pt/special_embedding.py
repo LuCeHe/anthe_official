@@ -93,7 +93,7 @@ class SoftPOS(nn.Module):
 
 
 class HSoftPOS(nn.Module):
-    def __init__(self, vocab_size, embed_dim, n_layers=2, tcembr=None, tcconvr=None, tclength=2):
+    def __init__(self, vocab_size, embed_dim, n_layers=2, tcembr=None, tcconvr=None, tclength=2, extend_axis=1):
         super(HSoftPOS, self).__init__()
 
         assert tcembr is None or isinstance(tcembr, float)
@@ -105,6 +105,8 @@ class HSoftPOS(nn.Module):
         self.tcembr = tcembr
         self.tcconvr = tcconvr
         self.tclength = tclength
+        self.extend_axis = extend_axis
+        self.kernel_size = 3
 
         local_d = int(embed_dim / 2 / n_layers)
         embd_d = embed_dim - local_d * (2 * n_layers - 1)
@@ -121,14 +123,17 @@ class HSoftPOS(nn.Module):
 
         self.spos, self.convs = nn.ModuleList(), nn.ModuleList()
         for i in range(n_layers):
-            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1))
+            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=extend_axis))
             if i < n_layers - 1:
-                self.convs.append(conv1d(embd_d if i == 0 else local_d, local_d, 3, padding=2 ** i, dilation=2 ** i))
+                self.convs.append(conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i))
 
     def forward(self, inputs):
         x = self.emb(inputs)
+        x = torch.transpose(x, 1, 2)
+
         xs = [x]
-        for conv in self.convs:
+        for i, conv in enumerate(self.convs):
+            x = torch.nn.functional.pad(x, ((self.kernel_size - 1) * (2 ** i), 0, 0, 0))
             x = conv(x)
             xs.append(x)
 
@@ -137,7 +142,7 @@ class HSoftPOS(nn.Module):
             y = spos(x)
             ys.append(y)
 
-        x = torch.cat(ys, dim=-1)
+        x = torch.cat(ys, dim=self.extend_axis)
 
         return x
 

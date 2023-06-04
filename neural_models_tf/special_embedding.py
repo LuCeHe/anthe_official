@@ -123,8 +123,8 @@ class HSoftPOS(tf.keras.layers.Layer):
             if i < n_layers - 1: self.convs.append(conv1d(local_d, 3, padding='causal', dilation_rate=2 ** i))
 
     def call(self, inputs):
-
         x = self.emb(inputs)
+
         xs = [x]
         for conv in self.convs:
             x = conv(x)

@@ -15,20 +15,20 @@ import numpy as np
 torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
-d_model = 7
+d_model = 16
 max_sequence_len = 6
-batch_size = 2
+batch_size = 3
 dilation = 2
 kernel_size = 3
-pt_channel_axis = -1  # 1 or -1
+pt_channel_axis = 1  # 1 or -1
 assert pt_channel_axis in [1, -1]
 
 check_embeddings = False
 check_softpos = False
 check_conv = False
-check_geglu = True
+check_geglu = False
 check_ffn = False
-check_hsoftpos = False
+check_hsoftpos = True
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
@@ -52,7 +52,7 @@ if check_embeddings:
     output_tf = embedding_layer_tf(sequences)
 
     # Compare
-    print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+    print('Are the Embedding TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
 if check_softpos:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
@@ -79,7 +79,7 @@ if check_softpos:
         output_pt = softpos_layer_pt(input_tensor)
         output_pt = torch.transpose(output_pt, 1, 2)
 
-    print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+    print('Are the SoftPOS TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
 if check_conv:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
@@ -99,10 +99,7 @@ if check_conv:
 
     conv1d_tf.kernel.assign(conv_weight_pt)
     conv1d_tf.bias.assign(conv_bias_pt)
-    # conv_weight_tf = conv1d_tf.kernel.numpy()
-    # conv_bias_tf = conv1d_tf.bias.numpy()
 
-    # Initialize weights
     output_tf = conv1d_tf(input_tensor)
 
     input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
@@ -110,14 +107,14 @@ if check_conv:
 
     output_pt = conv1d_pt(input_tensor)
     output_pt = torch.transpose(output_pt, 1, 2)
-    print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+    print('Are the Conv1D TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
 if check_hsoftpos:
     n_layers = 2
 
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
 
-    hsoftpos_layer_pt = HSoftPOSPT(vocab_size, d_model, n_layers=n_layers)
+    hsoftpos_layer_pt = HSoftPOSPT(vocab_size, d_model, n_layers=n_layers, extend_axis=pt_channel_axis)
     hsoftpos_layer_tf = HSoftPOSTF(vocab_size, d_model, n_layers=n_layers)
 
     # Initialize TF embeddings as PT
@@ -154,23 +151,16 @@ if check_hsoftpos:
 
         conv_weight_tf = hsoftpos_layer_tf.convs[j].kernel.numpy()
         conv_bias_tf = hsoftpos_layer_tf.convs[j].bias.numpy()
-        # hsoftpos_layer_tf.convs[j].weight.detach().numpy()
-        print(conv_weight_pt.shape, conv_bias_pt.shape)
-        print(conv_bias_pt)
-        print(conv_weight_pt)
-        print(conv_weight_tf.shape, conv_bias_tf.shape)
-        print(conv_bias_tf)
-        print(conv_weight_tf)
 
     # Initialize weights
     output_tf = hsoftpos_layer_tf(sequences)
-    output_pt = hsoftpos_layer_pt(torch.from_numpy(sequences))
+    if pt_channel_axis == -1:
+        output_pt = hsoftpos_layer_pt(torch.from_numpy(sequences))
+    else:
+        output_pt = hsoftpos_layer_pt(torch.from_numpy(sequences))
+        output_pt = torch.transpose(output_pt, 1, 2)
 
-    print(output_tf)
-    print(output_pt)
-    print(output_tf.shape, output_pt.shape)
-
-    print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+    print('Are the HSoftPOS TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
 if check_geglu:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
