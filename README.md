@@ -7,7 +7,11 @@ that improves on the Transformer performance with much fewer parameters.
 To run the experiments run the ```train.py``` file. If you want to activate the Transformer architecture, pass the
 argument ```--comments=sameemb_projectoutput```. If you want to activate the Anthe architecture, pass the argument
 ```--comments=geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2```. By default it will use
-the WMT14 dataset. If you want to use the WMT17 add the following text to the comments argument:
+the WMT14 dataset. Download the tokenizers from [here](https://drive.google.com/drive/folders/1YUABrVUz3oGKgGfMJNWQl0WCP_nVjhiS)
+pretrained by [strutive07](https://github.com/strutive07/transformer-tensorflow2.0),
+before running the experiment on WMT14, and place them in the folder ```work/data/wmt```, 
+if this repo folder is in ```work```. 
+If you want to use the WMT17 add the following text to the comments argument:
 ```--comments=..._lpair:cs-en```, where the available
 language pairs are cs-en, de-en, fi-en, lv-en, ru-en, tr-en, zh-en.
 
