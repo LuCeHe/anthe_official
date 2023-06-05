@@ -8,6 +8,8 @@ from anthe_official.neural_models_pt import HSoftPOS as HSoftPOSPT
 from anthe_official.neural_models_tf import HSoftPOS as HSoftPOSTF
 from anthe_official.neural_models_pt import GEGLU as GEGLUPT
 from anthe_official.neural_models_tf import GEGLU as GEGLUTF
+from anthe_official.neural_models_pt import PositionWiseFeedForwardLayer as PositionWiseFeedForwardLayerPT
+from anthe_official.neural_models_tf import PositionWiseFeedForwardLayer as PositionWiseFeedForwardLayerTF
 
 import numpy as np
 
@@ -16,19 +18,20 @@ torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
 d_model = 16
-max_sequence_len = 6
+max_sequence_len = 7
 batch_size = 3
 dilation = 2
 kernel_size = 3
-pt_channel_axis = 1  # 1 or -1
+pt_channel_axis = -1  # 1 or -1
 assert pt_channel_axis in [1, -1]
+comments = ''
 
 check_embeddings = False
 check_softpos = False
 check_conv = False
-check_geglu = False
+check_hsoftpos = False
 check_ffn = False
-check_hsoftpos = True
+check_geglu = True
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
@@ -162,6 +165,39 @@ if check_hsoftpos:
 
     print('Are the HSoftPOS TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
+if check_ffn:
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+
+    ffn_pt = PositionWiseFeedForwardLayerPT(4 * d_model, d_model, comments)
+    ffn_tf = PositionWiseFeedForwardLayerTF(4 * d_model, d_model, comments)
+
+    w_1 = ffn_pt.w_1.weight.detach().numpy().T
+    b_1 = ffn_pt.w_1.bias.detach().numpy().T
+    w_2 = ffn_pt.w_2.weight.detach().numpy().T
+    b_2 = ffn_pt.w_2.bias.detach().numpy().T
+
+    ffn_tf.build((batch_size, max_sequence_len, d_model))
+    ffn_tf.w_1.build((batch_size, max_sequence_len, d_model))
+    ffn_tf.w_2.build((batch_size, max_sequence_len, 4 * d_model))
+
+    ffn_tf.w_1.kernel.assign(w_1)
+    ffn_tf.w_1.bias.assign(b_1)
+    ffn_tf.w_2.kernel.assign(w_2)
+    ffn_tf.w_2.bias.assign(b_2)
+
+    # Initialize weights
+    output_tf = ffn_tf(input_tensor)
+
+    if pt_channel_axis == -1:
+        output_pt = ffn_pt(torch.from_numpy(input_tensor))
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = ffn_pt(input_tensor)
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    print('Are the FFN TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+    print('Only works for pt_channel_axis == -1')
+
 if check_geglu:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
     geglu_layer_pt = GEGLUPT(4 * d_model, d_model, comments='')
@@ -177,7 +213,7 @@ if check_geglu:
 
     geglu_layer_tf.build((batch_size, max_sequence_len, d_model))
     geglu_layer_tf.w_1.build((batch_size, max_sequence_len, d_model))
-    geglu_layer_tf.w_2.build((batch_size, max_sequence_len, d_model))
+    geglu_layer_tf.w_2.build((batch_size, max_sequence_len, 2 * 4 * d_model // 3))
     geglu_layer_tf.w_3.build((batch_size, max_sequence_len, d_model))
 
     geglu_layer_tf.w_1.kernel.assign(w1_pt)
@@ -197,4 +233,4 @@ if check_geglu:
         output_pt = geglu_layer_pt(input_tensor)
         output_pt = torch.transpose(output_pt, 1, 2)
 
-    print('Are the TF and PT implementation equivalent?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+    print('Are the GEGLU TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
