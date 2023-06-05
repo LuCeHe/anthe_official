@@ -47,10 +47,9 @@ def get_tokenizer():
         shutil.rmtree(os.path.join(WKT103DIR, 'wikitext-103-raw'))
 
 
-def tokenize_wmt17():
+def tokenize_wmt17(sub_pairs = ['ru-en']):
     get_tokenizer()
 
-    sub_pairs = ['ru-en']
     for langs in sub_pairs:
         l1, l2 = langs.split('-')
         print(l1, l2)
@@ -143,6 +142,8 @@ class WMT17(tf.keras.utils.Sequence):
         self.on_epoch_end()
         self.l1, self.l2 = language_pair.split('-')
 
+        if not os.path.exists(self.preprocessed_data_path):
+            tokenize_wmt17(sub_pairs=[language_pair])
         dataset = load_from_disk(self.preprocessed_data_path)[self.data_split]
         n_samples = len(dataset)
         print(f"Loaded {n_samples} samples from {self.preprocessed_data_path} for {self.data_split} split")
