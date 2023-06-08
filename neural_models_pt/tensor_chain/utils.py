@@ -1,26 +1,22 @@
-import numpy as np
-from math import sqrt
-import tensorflow as tf
-
+import torch
+import math
 
 def highestPowerOf2(n):
     return (n & (~(n - 1)))
 
-
-def factors(n):  # (cf. https://stackoverflow.com/a/15703327/849891)
+def factors(n):
     j = 2
     while n > 1:
-        for i in range(j, int(sqrt(n + 0.05)) + 1):
+        for i in range(j, int(math.sqrt(n + 0.05)) + 1):
             if n % i == 0:
-                n //= i;
+                n //= i
                 j = i
                 yield i
                 break
         else:
             if n > 1:
-                yield n;
+                yield n
                 break
-
 
 def get_two_factors(n):
     term1 = 1
@@ -32,13 +28,12 @@ def get_two_factors(n):
         return factor_list[0] * factor_list[1], factor_list[2]
     elif ln > 3:
         flist = sorted(factor_list)
-        terms = np.ones(2, dtype=int)
+        terms = torch.ones(2, dtype=torch.int)
         counter = 0
         while len(flist) > 0:
             terms[counter % 2 * (-1) ** (counter // 2) - (counter // 2) % 2] *= flist.pop(0)
             counter += 1
         return terms[0], terms[1]
-
 
 def get_four_factors(n):
     factor_list = list(factors(n))
@@ -50,13 +45,12 @@ def get_four_factors(n):
         return factor_list[0], factor_list[1], factor_list[2], factor_list[3]
     elif len(factor_list) > 4:
         flist = sorted(factor_list)
-        terms = np.ones(4, dtype=int)
+        terms = torch.ones(4, dtype=torch.int)
         counter = 0
         while len(flist) > 0:
             terms[counter % 4 * (-1) ** (counter // 4) - (counter // 4) % 2] *= flist.pop(0)
             counter += 1
         return terms[0], terms[1], terms[2], terms[3]
-
 
 def get_three_factors_v2(n):
     factor_list = list(factors(n))
@@ -66,18 +60,17 @@ def get_three_factors_v2(n):
         return factor_list[0], factor_list[1], factor_list[2]
     elif len(factor_list) > 3:
         flist = sorted(factor_list)
-        terms = np.ones(3, dtype=int)
+        terms = torch.ones(3, dtype=torch.int)
         counter = 0
         while len(flist) > 0:
             terms[counter % 3 * (-1) ** (counter // 3) - (counter // 3) % 2] *= flist.pop(0)
             counter += 1
         return terms[0], terms[1], terms[2]
 
-
 def get_three_factors(n):
     m = highestPowerOf2(n)
     r = n // m
-    ml = int(np.log2(m))
+    ml = int(math.log2(m))
     if r > 1 and m > 1:
         if m > 2:
             result = [2 ** (ml // 2), r, m // (2 ** (ml // 2))]
@@ -87,7 +80,7 @@ def get_three_factors(n):
             if rlen == 1:
                 result = [2, r, 1]
             else:
-                result = [int(np.prod(rlist[:rlen - 1])), 2, rlist[rlen - 1]]
+                result = [int(torch.prod(torch.tensor(rlist[:rlen - 1]))), 2, rlist[rlen - 1]]
     elif r == 1:
         m = n // 2
         return [2 ** ((ml - 1) // 2), 2, m // (2 ** ((ml - 1) // 2))]
@@ -99,16 +92,12 @@ def get_three_factors(n):
         elif mlen == 2:
             result = [mlist[0], 1, mlist[1]]
         else:
-            result = [mlist[0], int(np.prod(mlist[1:mlen - 1])), mlist[mlen - 1]]
-    assert (int(np.prod(result)) == n)
+            result = [mlist[0], int(torch.prod(torch.tensor(mlist[1:mlen - 1]))), mlist[mlen - 1]]
+    assert (int(torch.prod(torch.tensor(result))) == n)
     return result
 
-
-def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
-                   initializer, regularizer, constraint):
-    # random_string = ''.join([str(r) for r in np.random.choice(10, 4)])
-    # name = name + '_' + random_string
-
+def get_tc_kernel(input_size, output_size, length, bond, ratio):
+    
     if bond is None or bond < 1:
         if ratio is None:
             r = 0.2
@@ -139,7 +128,7 @@ def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
 
         bond = max(2, int((-input_dims[0] * output_dims[0]
                            - input_dims[2] * output_dims[2]
-                           + sqrt((input_dims[0] * output_dims[0]
+                           + math.sqrt((input_dims[0] * output_dims[0]
                                    + input_dims[2] * output_dims[2]) ** 2
                                   + 4 * input_dims[1] * output_dims[1]
                                   * input_size * output_size * r))
@@ -163,7 +152,7 @@ def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
 
         bond = max(2, int(
             -input_dims[0] * output_dims[0] - input_dims[3] * output_dims[3]
-            + sqrt((input_dims[0] * output_dims[0] + input_dims[3] * output_dims[3]) ** 2 +
+            + math.sqrt((input_dims[0] * output_dims[0] + input_dims[3] * output_dims[3]) ** 2 +
                    4 * (input_dims[1] * output_dims[1] + input_dims[2] * output_dims[2]) *
                    input_size * output_size * r) / (
                                2 * (input_dims[1] * output_dims[1] + input_dims[2] * output_dims[2]))))
@@ -181,14 +170,13 @@ def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
                 + input_dims[3] * output_dims[3]
         )
 
-
     elif length == -3:
         input_dims = get_three_factors_v2(input_size)
         output_dims = get_three_factors_v2(output_size)
 
         bond = max(2, int((-input_dims[0] * output_dims[0]
                            - input_dims[2] * output_dims[2]
-                           + sqrt((input_dims[0] * output_dims[0]
+                           + math.sqrt((input_dims[0] * output_dims[0]
                                    + input_dims[2] * output_dims[2]) ** 2
                                   + 4 * input_dims[1] * output_dims[1]
                                   * input_size * output_size * r))
@@ -199,17 +187,13 @@ def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
 
         einsum_string = 'ijk,ljmr,smp->ilskrp'
 
-
     else:
         raise ValueError('TC length greater than 4 not implemented')
 
     for i in range(len(kernel_dims)):
-        kernels.append(self.add_weight(name + '_' + str(i),
-                                       shape=kernel_dims[i],
-                                       initializer=initializer, regularizer=regularizer,
-                                       constraint=constraint, trainable=True, dtype=self.dtype))
+        kernels.append(torch.nn.Parameter(torch.empty(kernel_dims[i]), requires_grad=True))
 
-    kernel = tf.einsum(einsum_string, *kernels)
-    kernel = tf.reshape(kernel, [input_size, output_size])
+    kernel = torch.einsum(einsum_string, *kernels)
+    kernel = kernel.view(input_size, output_size)
 
     return kernel

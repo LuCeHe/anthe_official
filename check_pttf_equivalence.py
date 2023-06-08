@@ -1,6 +1,8 @@
 import torch
 import tensorflow as tf
 from anthe_official.neural_models_pt import EmbeddingLayer as EmbeddingLayerPT
+from anthe_official.neural_models_pt.tensor_chain.dense import TCDense as TCDensePT
+from anthe_official.neural_models_ft.tensor_chain.dense import TCDense as TCDenseFT
 from anthe_official.neural_models_tf import EmbeddingLayer as EmbeddingLayerTF
 from anthe_official.neural_models_pt import SoftPOS as SoftPOSPT
 from anthe_official.neural_models_tf import SoftPOS as SoftPOSTF
@@ -32,6 +34,8 @@ check_conv = False
 check_hsoftpos = False
 check_ffn = False
 check_geglu = True
+check_tcdense = True
+
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
@@ -234,3 +238,11 @@ if check_geglu:
         output_pt = torch.transpose(output_pt, 1, 2)
 
     print('Are the GEGLU TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+
+
+if check_tcdense:
+    tc_length = 2
+    ratio = .1
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    tcdense_pt = TCDensePT(d_model, tc_length=tc_length, ratio=ratio)
+    tcdense_tf = TCDenseFT(d_model, tc_length=tc_length, ratio=ratio)
