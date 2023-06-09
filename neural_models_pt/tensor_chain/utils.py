@@ -97,7 +97,7 @@ def get_three_factors(n):
     return result
 
 def get_tc_kernel(input_size, output_size, length, bond, ratio):
-    
+
     if bond is None or bond < 1:
         if ratio is None:
             r = 0.2
@@ -191,9 +191,14 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio):
         raise ValueError('TC length greater than 4 not implemented')
 
     for i in range(len(kernel_dims)):
-        kernels.append(torch.nn.Parameter(torch.empty(kernel_dims[i]), requires_grad=True))
+        w = torch.nn.Parameter(torch.empty(kernel_dims[i]), requires_grad=True)
+        torch.nn.init.xavier_uniform_(w, gain=1.)
+        print(w)
+        kernels.append(w)
 
     kernel = torch.einsum(einsum_string, *kernels)
-    kernel = kernel.view(input_size, output_size)
+    # print(kernel.shape)
+    # kernel = kernel.view(input_size, output_size)
+    kernel = torch.reshape(kernel, (input_size, output_size))
 
     return kernel

@@ -2,7 +2,7 @@ import torch
 import tensorflow as tf
 from anthe_official.neural_models_pt import EmbeddingLayer as EmbeddingLayerPT
 from anthe_official.neural_models_pt.tensor_chain.dense import TCDense as TCDensePT
-from anthe_official.neural_models_ft.tensor_chain.dense import TCDense as TCDenseFT
+from anthe_official.neural_models_tf.tensor_chain.dense import TCDense as TCDenseFT
 from anthe_official.neural_models_tf import EmbeddingLayer as EmbeddingLayerTF
 from anthe_official.neural_models_pt import SoftPOS as SoftPOSPT
 from anthe_official.neural_models_tf import SoftPOS as SoftPOSTF
@@ -20,7 +20,7 @@ torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
 d_model = 16
-max_sequence_len = 7
+max_sequence_len = 1
 batch_size = 3
 dilation = 2
 kernel_size = 3
@@ -33,9 +33,8 @@ check_softpos = False
 check_conv = False
 check_hsoftpos = False
 check_ffn = False
-check_geglu = True
+check_geglu = False
 check_tcdense = True
-
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
@@ -239,10 +238,33 @@ if check_geglu:
 
     print('Are the GEGLU TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
-
 if check_tcdense:
-    tc_length = 2
+    tc_length = 3
     ratio = .1
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    tcdense_pt = TCDensePT(d_model, tc_length=tc_length, ratio=ratio)
+    tcdense_pt = TCDensePT(d_model, d_model, tc_length=tc_length, ratio=ratio)
     tcdense_tf = TCDenseFT(d_model, tc_length=tc_length, ratio=ratio)
+
+    w_1 = tcdense_pt.weight.detach().numpy()
+    b_1 = tcdense_pt.bias.detach().numpy().T
+
+    tcdense_tf.build((batch_size, max_sequence_len, d_model))
+
+    # tcdense_tf.kernel.assign(w_1)
+    # tcdense_tf.bias.assign(b_1)
+    tcdense_tf.kernel = w_1
+    tcdense_tf.bias = b_1
+
+    output_tf = tcdense_tf(input_tensor)
+
+    if pt_channel_axis == -1:
+        output_pt = tcdense_pt(torch.from_numpy(input_tensor))
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = tcdense_pt(input_tensor)
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    print(output_pt)
+    print(output_tf)
+
+    print('Are the TCDense TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
