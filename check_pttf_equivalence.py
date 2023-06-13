@@ -12,15 +12,19 @@ from anthe_official.neural_models_pt import GEGLU as GEGLUPT
 from anthe_official.neural_models_tf import GEGLU as GEGLUTF
 from anthe_official.neural_models_pt import PositionWiseFeedForwardLayer as PositionWiseFeedForwardLayerPT
 from anthe_official.neural_models_tf import PositionWiseFeedForwardLayer as PositionWiseFeedForwardLayerTF
+from anthe_official.neural_models_pt import AntheEncoderBlock as AntheEncoderBlockPT
+from anthe_official.neural_models_tf import AntheEncoderBlock as AntheEncoderBlockTF
+from anthe_official.neural_models_pt import MultiHeadAttention as MultiHeadAttentionPT
+from anthe_official.neural_models_tf import MultiHeadAttention as MultiHeadAttentionTF
 
 import numpy as np
 
 torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
-d_model = 16
-max_sequence_len = 13
-batch_size = 3
+d_model = 8
+max_sequence_len = 10
+batch_size = 2
 dilation = 2
 kernel_size = 3
 pt_channel_axis = -1  # 1 or -1
@@ -30,10 +34,13 @@ comments = ''
 check_embeddings = False
 check_softpos = False
 check_conv = False
-check_hsoftpos = True
+check_ln = False
+check_hsoftpos = False
 check_ffn = False
 check_geglu = False
 check_tcdense = False
+check_mha = True
+check_antheenc = False
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
@@ -119,6 +126,28 @@ if check_conv:
     output_pt = torch.transpose(output_pt, 1, 2)
     print('Are the Conv1D TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
+
+
+if check_ln:
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    ln_pt = torch.nn.LayerNorm(d_model, eps=1e-6)
+    ln_tf = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+    ln_weight_pt = ln_pt.weight.detach().numpy()
+    ln_bias_pt = ln_pt.bias.detach().numpy()
+
+    ln_tf.build((batch_size, max_sequence_len, d_model))
+
+    ln_tf.gamma.assign(ln_weight_pt)
+    ln_tf.beta.assign(ln_bias_pt)
+
+    output_pt = ln_pt(torch.from_numpy(input_tensor))
+    output_tf = ln_tf(input_tensor)
+    # print(output_pt)
+    # print(output_tf)
+
+    print('Are the LayerNorm TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy(), rtol=1.e-4, atol=1.e-7))
+
 if check_hsoftpos:
     n_layers = 2
 
@@ -175,7 +204,7 @@ if check_hsoftpos:
 if check_ffn:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
 
-    ffn_pt = PositionWiseFeedForwardLayerPT(4 * d_model, d_model, comments)
+    ffn_pt = PositionWiseFeedForwardLayerPT(4 * d_model, d_model, comments, axis=pt_channel_axis)
     ffn_tf = PositionWiseFeedForwardLayerTF(4 * d_model, d_model, comments)
 
     w_1 = ffn_pt.w_1.weight.detach().numpy().T
@@ -203,11 +232,10 @@ if check_ffn:
         output_pt = torch.transpose(output_pt, 1, 2)
 
     print('Are the FFN TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
-    print('Only works for pt_channel_axis == -1')
 
 if check_geglu:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    geglu_layer_pt = GEGLUPT(4 * d_model, d_model, comments='')
+    geglu_layer_pt = GEGLUPT(4 * d_model, d_model, comments='', axis=pt_channel_axis)
     geglu_layer_tf = GEGLUTF(4 * d_model, d_model, comments='')
 
     w1_pt = geglu_layer_pt.w_1.weight.detach().numpy().T
@@ -246,7 +274,7 @@ if check_tcdense:
     tc_length = 3
     ratio = .1
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    tcdense_pt = TCDensePT(d_model, d_model, tc_length=tc_length, ratio=ratio)
+    tcdense_pt = TCDensePT(d_model, d_model, tc_length=tc_length, ratio=ratio, axis=pt_channel_axis)
     tcdense_tf = TCDenseFT(d_model, tc_length=tc_length, ratio=ratio)
 
     w_1 = tcdense_pt.weight.detach().numpy()
@@ -254,8 +282,6 @@ if check_tcdense:
 
     tcdense_tf.build((batch_size, max_sequence_len, d_model))
 
-    # tcdense_tf.kernel.assign(w_1)
-    # tcdense_tf.bias.assign(b_1)
     tcdense_tf.kernel = w_1
     tcdense_tf.bias = b_1
 
@@ -268,7 +294,105 @@ if check_tcdense:
         output_pt = tcdense_pt(input_tensor)
         output_pt = torch.transpose(output_pt, 1, 2)
 
-    print(output_pt)
-    print(output_tf)
+    # print(output_pt)
+    # print(output_tf)
 
     print('Are the TCDense TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+
+
+if check_antheenc:
+    tc_length = 3
+    ratio = .1
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    anthenc_pt = AntheEncoderBlockPT(4, d_model, 4*d_model, 0.0)
+    anthenc_tf = AntheEncoderBlockTF(4, d_model, 4*d_model, 0.0)
+
+
+    # LN 1
+    ln_weight_pt = anthenc_pt.layer_norm_1.weight.detach().numpy()
+    ln_bias_pt = anthenc_pt.layer_norm_1.bias.detach().numpy()
+
+    anthenc_tf.layer_norm_1.build((batch_size, max_sequence_len, d_model))
+
+    anthenc_tf.layer_norm_1.gamma.assign(ln_weight_pt)
+    anthenc_tf.layer_norm_1.beta.assign(ln_bias_pt)
+
+
+    # LN 2
+    ln_weight_pt = anthenc_pt.layer_norm_2.weight.detach().numpy()
+    ln_bias_pt = anthenc_pt.layer_norm_2.bias.detach().numpy()
+
+    anthenc_tf.layer_norm_2.build((batch_size, max_sequence_len, d_model))
+
+    anthenc_tf.layer_norm_2.gamma.assign(ln_weight_pt)
+    anthenc_tf.layer_norm_2.beta.assign(ln_bias_pt)
+
+
+
+
+
+
+
+
+
+    w_1 = tcdense_pt.weight.detach().numpy()
+    b_1 = tcdense_pt.bias.detach().numpy().T
+
+    tcdense_tf.build((batch_size, max_sequence_len, d_model))
+
+    tcdense_tf.kernel = w_1
+    tcdense_tf.bias = b_1
+
+    output_tf = tcdense_tf(input_tensor)
+
+    if pt_channel_axis == -1:
+        output_pt = tcdense_pt(torch.from_numpy(input_tensor))
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = tcdense_pt(input_tensor)
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    # print(output_pt)
+    # print(output_tf)
+
+    print('Are the AntheEncoder TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+
+
+
+if check_mha:
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+
+    att_pt = MultiHeadAttentionPT(4, d_model, comments)
+    att_tf = MultiHeadAttentionTF(4, d_model, comments)
+
+    w_q = att_pt.w_query.weight.detach().numpy().T
+    b_q = att_pt.w_query.bias.detach().numpy().T
+    w_k = att_pt.w_key.weight.detach().numpy().T
+    b_k = att_pt.w_key.bias.detach().numpy().T
+    w_v = att_pt.w_value.weight.detach().numpy().T
+    b_v = att_pt.w_value.bias.detach().numpy().T
+
+    att_tf.w_query.build((batch_size, max_sequence_len, d_model))
+    att_tf.w_key.build((batch_size, max_sequence_len, d_model))
+    att_tf.w_value.build((batch_size, max_sequence_len, d_model))
+
+    att_tf.w_query.kernel.assign(w_q)
+    att_tf.w_query.bias.assign(b_q)
+    att_tf.w_key.kernel.assign(w_k)
+    att_tf.w_key.bias.assign(b_k)
+    att_tf.w_value.kernel.assign(w_v)
+    att_tf.w_value.bias.assign(b_v)
+
+    # Initialize weights
+    output_tf = att_tf([input_tensor, input_tensor, input_tensor, None])
+
+    if pt_channel_axis == -1:
+        x = torch.from_numpy(input_tensor)
+        output_pt = att_pt(x, x, x, None)
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        x = input_tensor
+        output_pt = att_pt(x, x, x, None)
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    print('Are the MHA TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))

@@ -48,9 +48,10 @@ class MultiHeadAttention(nn.Module):
             self.w_value = lambda x: x
 
         elif 'sharedqkv' in comments:
-            self.w_query = nn.Linear(d_model, d_model)
-            self.w_key = nn.Linear(d_model, d_model)
-            self.w_value = nn.Linear(d_model, d_model)
+            w = nn.Linear(d_model, d_model)
+            self.w_query = w
+            self.w_key = w
+            self.w_value = w
 
         elif 'tclayer' in comments or 'tcpreatt' in comments:
             tcr = str2val(comments, 'tcpreatt', float, default=.2)

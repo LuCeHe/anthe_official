@@ -5,7 +5,7 @@ from anthe_official.neural_models_pt.tensor_chain.utils import get_tc_kernel
 
 
 class TCDense(nn.Module):
-    def __init__(self, in_features, out_features, tc_length=3, bond=None, ratio=None):
+    def __init__(self, in_features, out_features, tc_length=3, bond=None, ratio=None, axis=-1):
         super(TCDense, self).__init__()
 
         self.in_features = in_features
@@ -13,6 +13,7 @@ class TCDense(nn.Module):
         self.tc_length = tc_length
         self.bond = bond
         self.ratio = ratio
+        self.axis = axis
 
         self.weight = None
         self.bias = None
@@ -26,4 +27,13 @@ class TCDense(nn.Module):
         self.bias = nn.Parameter(torch.zeros(self.out_features), requires_grad=True)
 
     def forward(self, input):
-        return torch.matmul(input, self.weight) + self.bias
+        x = input
+        if self.axis == 1:
+            x = torch.transpose(x, 1, 2)
+
+        x = torch.matmul(x, self.weight) + self.bias
+
+        if self.axis == 1:
+            x = torch.transpose(x, 1, 2)
+
+        return x

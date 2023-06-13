@@ -185,8 +185,10 @@ AntheDecoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropo
 
 
 class PositionWiseFeedForwardLayer(nn.Module):
-    def __init__(self, d_point_wise_ff, d_model, comments=''):
+    def __init__(self, d_point_wise_ff, d_model, comments='', axis=-1):
         super(PositionWiseFeedForwardLayer, self).__init__()
+
+        self.axis=axis
 
         if 'noffn' in comments:
             self.w_1 = lambda x: x
@@ -205,16 +207,25 @@ class PositionWiseFeedForwardLayer(nn.Module):
             self.w_2 = nn.Linear(d_point_wise_ff, d_model)
 
     def forward(self, inputs):
-        inputs = self.w_1(inputs)
-        inputs = nn.functional.relu(inputs)
-        return self.w_2(inputs)
+
+        x = inputs
+        if self.axis == 1:
+            x = torch.transpose(x, 1, 2)
+        x = self.w_1(x)
+        x = nn.functional.relu(x)
+        x = self.w_2(x)
+
+        if self.axis == 1:
+            x = torch.transpose(x, 1, 2)
+        return x
 
 
 class GEGLU(nn.Module):
-    def __init__(self, d_point_wise_ff, d_model, comments=''):
+    def __init__(self, d_point_wise_ff, d_model, comments='', axis=-1):
         super(GEGLU, self).__init__()
         # https://arxiv.org/pdf/2002.05202.pdf
 
+        self.axis = axis
         d_point_wise_ff = 2 * d_point_wise_ff // 3
 
         if 'noffn' in comments:
@@ -239,10 +250,19 @@ class GEGLU(nn.Module):
         self.activation = nn.SiLU()
 
     def forward(self, inputs):
-        x1 = self.w_1(inputs)
-        x3 = self.w_3(inputs)
+        x = inputs
+        if self.axis == 1:
+            x = torch.transpose(x, 1, 2)
+
+
+        x1 = self.w_1(x)
+        x3 = self.w_3(x)
         x2 = self.activation(x1) * x3
-        return self.w_2(x2)
+        x = self.w_2(x2)
+
+        if self.axis == 1:
+            x = torch.transpose(x, 1, 2)
+        return x
 
 
 def build_model(
