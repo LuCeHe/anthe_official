@@ -15,12 +15,11 @@ from anthe_official.neural_models_tf import PositionWiseFeedForwardLayer as Posi
 
 import numpy as np
 
-# torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
 d_model = 16
-max_sequence_len = 1
+max_sequence_len = 13
 batch_size = 3
 dilation = 2
 kernel_size = 3
@@ -31,17 +30,17 @@ comments = ''
 check_embeddings = False
 check_softpos = False
 check_conv = False
-check_hsoftpos = False
+check_hsoftpos = True
 check_ffn = False
 check_geglu = False
-check_tcdense = True
+check_tcdense = False
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
     print(sequences)
 
     # PT and TF
-    embedding_layer_pt = EmbeddingLayerPT(vocab_size, d_model)
+    embedding_layer_pt = EmbeddingLayerPT(vocab_size, d_model, channel_axis=pt_channel_axis)
     embedding_layer_tf = EmbeddingLayerTF(vocab_size, d_model)
 
     # Initialize weights
@@ -54,8 +53,14 @@ if check_embeddings:
     embedding_layer_tf.embedding.embeddings.assign(emb_matrix_tf)
 
     # Run
-    output_pt = embedding_layer_pt(torch.from_numpy(sequences))
     output_tf = embedding_layer_tf(sequences)
+
+    if pt_channel_axis == -1:
+        output_pt = embedding_layer_pt(torch.from_numpy(sequences))
+    else:
+        input_tensor = torch.from_numpy(sequences)
+        output_pt = embedding_layer_pt(input_tensor)
+        output_pt = torch.transpose(output_pt, 1, 2)
 
     # Compare
     print('Are the Embedding TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
@@ -90,8 +95,7 @@ if check_softpos:
 if check_conv:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
     conv1d_pt = torch.nn.Conv1d(in_channels=d_model, out_channels=d_model // 2, kernel_size=kernel_size, stride=1,
-                                padding=0,
-                                dilation=dilation)
+                                padding=0, dilation=dilation)
     conv1d_tf = tf.keras.layers.Conv1D(filters=d_model // 2, kernel_size=kernel_size, strides=1, padding='causal',
                                        dilation_rate=dilation)
     output_tf = conv1d_tf(input_tensor)

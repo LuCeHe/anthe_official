@@ -19,7 +19,8 @@ You can install it as a package with ```pip install anthe-official```.
 
 ## Layers Available
 
-The following layers are available for the Anthe architecture, only in TensorFlow 2.10.0 for now. 
+The following layers are available for the Anthe architecture, only in TensorFlow 2.10.0 for now, the Pytorch version
+are not fully functional yet. 
 You can access the Anthe architecture, the AntheEncoderBlock and the AntheDecoderBlock, like so:
 
 ```python

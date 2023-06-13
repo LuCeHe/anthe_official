@@ -30,10 +30,11 @@ def angle(pos, index, d_model):
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, vocab_size, d_model):
+    def __init__(self, vocab_size, d_model, channel_axis=-1):
         super(EmbeddingLayer, self).__init__()
         self.vocab_size = vocab_size
         self.d_model = d_model
+        self.channel_axis = channel_axis
 
         self.embedding = nn.Embedding(vocab_size, d_model)
 
@@ -45,6 +46,9 @@ class EmbeddingLayer(nn.Module):
         pos = positional_encoding(max_sequence_len, self.d_model)
 
         output = output + pos
+
+        if self.channel_axis == 1:
+            output = torch.transpose(output, 1, 2)
 
         return output
 
@@ -112,7 +116,7 @@ class HSoftPOS(nn.Module):
         embd_d = embed_dim - local_d * (2 * n_layers - 1)
 
         if tcembr is None:
-            self.emb = EmbeddingLayer(vocab_size, embd_d)
+            self.emb = EmbeddingLayer(vocab_size, embd_d, channel_axis=-1)
         else:
             self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcembr, tc_length=tclength)
 
@@ -123,9 +127,10 @@ class HSoftPOS(nn.Module):
 
         self.spos, self.convs = nn.ModuleList(), nn.ModuleList()
         for i in range(n_layers):
-            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=extend_axis))
+            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=1))
             if i < n_layers - 1:
-                self.convs.append(conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i))
+                self.convs.append(
+                    conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i))
 
     def forward(self, inputs):
         x = self.emb(inputs)
@@ -142,7 +147,11 @@ class HSoftPOS(nn.Module):
             y = spos(x)
             ys.append(y)
 
-        x = torch.cat(ys, dim=self.extend_axis)
+        x = torch.cat(ys, dim=1)
+
+
+        if self.extend_axis == -1:
+            x = torch.transpose(x, 1, 2)
 
         return x
 
