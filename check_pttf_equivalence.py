@@ -396,3 +396,4 @@ if check_mha:
         output_pt = torch.transpose(output_pt, 1, 2)
 
     print('Are the MHA TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
+
