@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from pyaromatics.stay_organized.utils import str2val
-from anthe_official.neural_models_tf.tensor_chain.dense import TCDense
+from anthe_official.neural_models_pt.tensor_chain.dense import TCDense
 
 
 class ScaledDotProductAttention(nn.Module):
@@ -25,20 +25,25 @@ class ScaledDotProductAttention(nn.Module):
 
 
 def gatingmech(x, y, z, wq=None, wk=None, wv=None):
+    # print(y)
     x = x * torch.sigmoid(wq(y))
     x = wv(x)
     z = wk(z)
     return x, y, z
 
+
 class MultiHeadAttention(nn.Module):
-    def __init__(self, attention_head_count, d_model, comments=''):
+    def __init__(self, attention_head_count, d_model, comments='', axis=-1):
         super(MultiHeadAttention, self).__init__()
 
         self.comments = comments
         self.attention_head_count = attention_head_count
+        self.axis = axis
 
         if d_model % attention_head_count != 0:
-            raise ValueError("d_model({}) % attention_head_count({}) is not zero. d_model must be multiple of attention_head_count.".format(d_model, attention_head_count))
+            raise ValueError(
+                "d_model({}) % attention_head_count({}) is not zero. d_model must be multiple of attention_head_count.".format(
+                    d_model, attention_head_count))
 
         self.d_h = d_model // attention_head_count
 
@@ -59,9 +64,9 @@ class MultiHeadAttention(nn.Module):
             tclength = str2val(comments, 'tclength', int, default=3)
             tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
-            self.w_query = TCDense(d_model, length=tclength, ratio=tcr)
-            self.w_key = TCDense(d_model, length=tclength, ratio=tcr)
-            self.w_value = TCDense(d_model, length=tclength, ratio=tcr)
+            self.w_query = TCDense(d_model, d_model, tc_length=tclength, ratio=tcr)
+            self.w_key = TCDense(d_model, d_model, tc_length=tclength, ratio=tcr)
+            self.w_value = TCDense(d_model, d_model, tc_length=tclength, ratio=tcr)
 
         else:
             self.w_query = nn.Linear(d_model, d_model)
@@ -86,11 +91,15 @@ class MultiHeadAttention(nn.Module):
     def forward(self, query, key, value, mask=None):
         batch_size = query.size(0)
 
+        if self.axis == 1:
+            query = torch.transpose(query, 1, 2)
+            key = torch.transpose(key, 1, 2)
+            value = torch.transpose(value, 1, 2)
+
         if 'gateattention' in self.comments:
             key, query, value = self.mixer([key, query, value])
             value, key, query = gatingmech(value, key, query, wq=self.w_query, wk=self.w_key, wv=self.w_value)
             key, query, value = self.unmixer([key, query, value])
-
         else:
             query = self.w_query(query)
             key = self.w_key(key)
@@ -104,4 +113,15 @@ class MultiHeadAttention(nn.Module):
         output = self.concat_head(output, batch_size)
         output = self.ff(output)
 
-        return output,
+        if self.axis == 1:
+            output = torch.transpose(output, 1, 2)
+            attention = torch.transpose(attention, 1, 2)
+
+        return output, attention
+
+    def split_head(self, tensor, batch_size):
+        # inputs tensor: (batch_size, seq_len, d_model)
+        return tensor.view(batch_size, -1, self.attention_head_count, self.d_h).transpose(1, 2)
+
+    def concat_head(self, tensor, batch_size):
+        return tensor.transpose(1, 2).contiguous().view(batch_size, -1, self.attention_head_count * self.d_h)

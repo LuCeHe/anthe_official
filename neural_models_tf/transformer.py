@@ -120,6 +120,8 @@ class EncoderLayer(tf.keras.layers.Layer):
 
     def call(self, inputs, mask):
         output, attention = self.attention([inputs, inputs, inputs, mask])
+        print(output)
+
         output = self.dropout_1(output)
         output = self.layer_norm_1(tf.add(inputs, output))  # residual network
         output_temp = output
@@ -186,7 +188,7 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 
 AntheDecoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob: \
-    EncoderLayer(
+    DecoderLayer(
         attention_head_count, d_model, d_point_wise_ff, dropout_prob,
         comments='geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2'
     )
@@ -236,9 +238,9 @@ class GEGLU(tf.keras.layers.Layer):
             tclength = str2val(comments, 'tclength', int, default=3)
             tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
-            self.w_1 = TCDense(d_point_wise_ff, length=tclength, ratio=tcr)
-            self.w_3 = TCDense(d_point_wise_ff, length=tclength, ratio=tcr)
-            self.w_2 = TCDense(d_model, length=tclength, ratio=tcr)
+            self.w_1 = TCDense(d_point_wise_ff, tc_length=tclength, ratio=tcr)
+            self.w_3 = TCDense(d_point_wise_ff, tc_length=tclength, ratio=tcr)
+            self.w_2 = TCDense(d_model, tc_length=tclength, ratio=tcr)
         else:
             self.w_1 = tf.keras.layers.Dense(d_point_wise_ff)
             self.w_3 = tf.keras.layers.Dense(d_point_wise_ff)

@@ -63,9 +63,9 @@ class MultiHeadAttention(tf.keras.layers.Layer):
             tclength = str2val(comments, 'tclength', int, default=3)
             tclength = str2val(comments, 'tclayerlength', int, default=tclength)
 
-            w_query = TCDense(d_model, length=tclength, ratio=tcr)
-            w_key = TCDense(d_model, length=tclength, ratio=tcr)
-            w_value = TCDense(d_model, length=tclength, ratio=tcr)
+            w_query = TCDense(d_model, tc_length=tclength, ratio=tcr)
+            w_key = TCDense(d_model, tc_length=tclength, ratio=tcr)
+            w_value = TCDense(d_model, tc_length=tclength, ratio=tcr)
 
         else:
             w_query = tf.keras.layers.Dense(d_model)

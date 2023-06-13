@@ -30,11 +30,11 @@ def angle(pos, index, d_model):
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, vocab_size, d_model, channel_axis=-1):
+    def __init__(self, vocab_size, d_model, axis=-1):
         super(EmbeddingLayer, self).__init__()
         self.vocab_size = vocab_size
         self.d_model = d_model
-        self.channel_axis = channel_axis
+        self.axis = axis
 
         self.embedding = nn.Embedding(vocab_size, d_model)
 
@@ -47,7 +47,7 @@ class EmbeddingLayer(nn.Module):
 
         output = output + pos
 
-        if self.channel_axis == 1:
+        if self.axis == 1:
             output = torch.transpose(output, 1, 2)
 
         return output

@@ -12,10 +12,14 @@ from anthe_official.neural_models_pt import GEGLU as GEGLUPT
 from anthe_official.neural_models_tf import GEGLU as GEGLUTF
 from anthe_official.neural_models_pt import PositionWiseFeedForwardLayer as PositionWiseFeedForwardLayerPT
 from anthe_official.neural_models_tf import PositionWiseFeedForwardLayer as PositionWiseFeedForwardLayerTF
-from anthe_official.neural_models_pt import AntheEncoderBlock as AntheEncoderBlockPT
-from anthe_official.neural_models_tf import AntheEncoderBlock as AntheEncoderBlockTF
 from anthe_official.neural_models_pt import MultiHeadAttention as MultiHeadAttentionPT
 from anthe_official.neural_models_tf import MultiHeadAttention as MultiHeadAttentionTF
+from anthe_official.neural_models_pt import AntheEncoderBlock as AntheEncoderBlockPT
+from anthe_official.neural_models_tf import AntheEncoderBlock as AntheEncoderBlockTF
+from anthe_official.neural_models_pt import EncoderLayer as EncoderLayerPT
+from anthe_official.neural_models_tf import EncoderLayer as EncoderLayerTF
+from anthe_official.neural_models_pt import AntheDecoderBlock as AntheDecoderBlockPT
+from anthe_official.neural_models_tf import AntheDecoderBlock as AntheDecoderBlockTF
 
 import numpy as np
 
@@ -23,7 +27,7 @@ torch.set_default_tensor_type(torch.FloatTensor)
 
 vocab_size = 100
 d_model = 8
-max_sequence_len = 10
+max_sequence_len = 3
 batch_size = 2
 dilation = 2
 kernel_size = 3
@@ -39,15 +43,17 @@ check_hsoftpos = False
 check_ffn = False
 check_geglu = False
 check_tcdense = False
-check_mha = True
+check_mha = False
+check_enclayer = False
 check_antheenc = False
+check_anthedec = True
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
     print(sequences)
 
     # PT and TF
-    embedding_layer_pt = EmbeddingLayerPT(vocab_size, d_model, channel_axis=pt_channel_axis)
+    embedding_layer_pt = EmbeddingLayerPT(vocab_size, d_model, axis=pt_channel_axis)
     embedding_layer_tf = EmbeddingLayerTF(vocab_size, d_model)
 
     # Initialize weights
@@ -126,8 +132,6 @@ if check_conv:
     output_pt = torch.transpose(output_pt, 1, 2)
     print('Are the Conv1D TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
-
-
 if check_ln:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
     ln_pt = torch.nn.LayerNorm(d_model, eps=1e-6)
@@ -146,7 +150,8 @@ if check_ln:
     # print(output_pt)
     # print(output_tf)
 
-    print('Are the LayerNorm TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy(), rtol=1.e-4, atol=1.e-7))
+    print('Are the LayerNorm TF == PT?',
+          np.allclose(output_pt.detach().numpy(), output_tf.numpy(), rtol=1.e-4, atol=1.e-7))
 
 if check_hsoftpos:
     n_layers = 2
@@ -299,70 +304,10 @@ if check_tcdense:
 
     print('Are the TCDense TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
-
-if check_antheenc:
-    tc_length = 3
-    ratio = .1
-    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    anthenc_pt = AntheEncoderBlockPT(4, d_model, 4*d_model, 0.0)
-    anthenc_tf = AntheEncoderBlockTF(4, d_model, 4*d_model, 0.0)
-
-
-    # LN 1
-    ln_weight_pt = anthenc_pt.layer_norm_1.weight.detach().numpy()
-    ln_bias_pt = anthenc_pt.layer_norm_1.bias.detach().numpy()
-
-    anthenc_tf.layer_norm_1.build((batch_size, max_sequence_len, d_model))
-
-    anthenc_tf.layer_norm_1.gamma.assign(ln_weight_pt)
-    anthenc_tf.layer_norm_1.beta.assign(ln_bias_pt)
-
-
-    # LN 2
-    ln_weight_pt = anthenc_pt.layer_norm_2.weight.detach().numpy()
-    ln_bias_pt = anthenc_pt.layer_norm_2.bias.detach().numpy()
-
-    anthenc_tf.layer_norm_2.build((batch_size, max_sequence_len, d_model))
-
-    anthenc_tf.layer_norm_2.gamma.assign(ln_weight_pt)
-    anthenc_tf.layer_norm_2.beta.assign(ln_bias_pt)
-
-
-
-
-
-
-
-
-
-    w_1 = tcdense_pt.weight.detach().numpy()
-    b_1 = tcdense_pt.bias.detach().numpy().T
-
-    tcdense_tf.build((batch_size, max_sequence_len, d_model))
-
-    tcdense_tf.kernel = w_1
-    tcdense_tf.bias = b_1
-
-    output_tf = tcdense_tf(input_tensor)
-
-    if pt_channel_axis == -1:
-        output_pt = tcdense_pt(torch.from_numpy(input_tensor))
-    else:
-        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
-        output_pt = tcdense_pt(input_tensor)
-        output_pt = torch.transpose(output_pt, 1, 2)
-
-    # print(output_pt)
-    # print(output_tf)
-
-    print('Are the AntheEncoder TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
-
-
-
 if check_mha:
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
 
-    att_pt = MultiHeadAttentionPT(4, d_model, comments)
+    att_pt = MultiHeadAttentionPT(4, d_model, comments, axis=pt_channel_axis)
     att_tf = MultiHeadAttentionTF(4, d_model, comments)
 
     w_q = att_pt.w_query.weight.detach().numpy().T
@@ -372,9 +317,13 @@ if check_mha:
     w_v = att_pt.w_value.weight.detach().numpy().T
     b_v = att_pt.w_value.bias.detach().numpy().T
 
+    w_ff = att_pt.ff.weight.detach().numpy().T
+    b_ff = att_pt.ff.bias.detach().numpy().T
+
     att_tf.w_query.build((batch_size, max_sequence_len, d_model))
     att_tf.w_key.build((batch_size, max_sequence_len, d_model))
     att_tf.w_value.build((batch_size, max_sequence_len, d_model))
+    att_tf.ff.build((batch_size, max_sequence_len, d_model))
 
     att_tf.w_query.kernel.assign(w_q)
     att_tf.w_query.bias.assign(b_q)
@@ -382,18 +331,321 @@ if check_mha:
     att_tf.w_key.bias.assign(b_k)
     att_tf.w_value.kernel.assign(w_v)
     att_tf.w_value.bias.assign(b_v)
+    att_tf.ff.kernel.assign(w_ff)
+    att_tf.ff.bias.assign(b_ff)
 
     # Initialize weights
-    output_tf = att_tf([input_tensor, input_tensor, input_tensor, None])
+    output_tf = att_tf([input_tensor, input_tensor, input_tensor, None])[0]
 
     if pt_channel_axis == -1:
         x = torch.from_numpy(input_tensor)
-        output_pt = att_pt(x, x, x, None)
+        output_pt = att_pt(x, x, x, None)[0]
     else:
-        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
-        x = input_tensor
-        output_pt = att_pt(x, x, x, None)
+        x = torch.from_numpy(input_tensor)
+        x = torch.transpose(x, 1, 2)
+        output_pt = att_pt(x, x, x, None)[0]
         output_pt = torch.transpose(output_pt, 1, 2)
 
     print('Are the MHA TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy()))
 
+if check_enclayer:
+    tc_length = 3
+    ratio = .1
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    comments = 'geglu_gateattention'  # geglu
+    # comments = ''  # geglu
+    enclayer_pt = EncoderLayerPT(4, d_model, 4 * d_model, 0.0, comments)
+    enclayer_tf = EncoderLayerTF(4, d_model, 4 * d_model, 0.0, comments)
+
+    # LN 1
+    ln_weight_pt = enclayer_pt.layer_norm_1.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_1.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_1.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_1.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_1.beta.assign(ln_bias_pt)
+
+    # LN 2
+    ln_weight_pt = enclayer_pt.layer_norm_2.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_2.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_2.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_2.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_2.beta.assign(ln_bias_pt)
+
+    # MHA
+    w_q = enclayer_pt.attention.w_query.weight.detach().numpy().T
+    b_q = enclayer_pt.attention.w_query.bias.detach().numpy().T
+    w_k = enclayer_pt.attention.w_key.weight.detach().numpy().T
+    b_k = enclayer_pt.attention.w_key.bias.detach().numpy().T
+    w_v = enclayer_pt.attention.w_value.weight.detach().numpy().T
+    b_v = enclayer_pt.attention.w_value.bias.detach().numpy().T
+
+    w_ff = enclayer_pt.attention.ff.weight.detach().numpy().T
+    b_ff = enclayer_pt.attention.ff.bias.detach().numpy().T
+
+    enclayer_tf.attention.w_query.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.w_key.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.w_value.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.ff.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.attention.w_query.kernel = w_q
+    enclayer_tf.attention.w_query.bias = b_q
+    enclayer_tf.attention.w_key.kernel = w_k
+    enclayer_tf.attention.w_key.bias = b_k
+    enclayer_tf.attention.w_value.kernel = w_v
+    enclayer_tf.attention.w_value.bias = b_v
+    enclayer_tf.attention.ff.kernel = w_ff
+    enclayer_tf.attention.ff.bias = b_ff
+
+    # GEGLU
+    w1_pt = enclayer_pt.position_wise_feed_forward_layer.w_1.weight.detach().numpy().T
+    w2_pt = enclayer_pt.position_wise_feed_forward_layer.w_2.weight.detach().numpy().T
+
+    b1_pt = enclayer_pt.position_wise_feed_forward_layer.w_1.bias.detach().numpy().T
+    b2_pt = enclayer_pt.position_wise_feed_forward_layer.w_2.bias.detach().numpy().T
+
+    enclayer_tf.position_wise_feed_forward_layer.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.position_wise_feed_forward_layer.w_1.build((batch_size, max_sequence_len, d_model))
+    dff = 2 * 4 * d_model // 3 if 'geglu' in comments else 4 * d_model
+    enclayer_tf.position_wise_feed_forward_layer.w_2.build((batch_size, max_sequence_len, dff))
+
+    enclayer_tf.position_wise_feed_forward_layer.w_1.kernel = w1_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_1.bias = b1_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_2.kernel = w2_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_2.bias = b2_pt
+
+    if 'geglu' in comments:
+        w3_pt = enclayer_pt.position_wise_feed_forward_layer.w_3.weight.detach().numpy().T
+        b3_pt = enclayer_pt.position_wise_feed_forward_layer.w_3.bias.detach().numpy().T
+        enclayer_tf.position_wise_feed_forward_layer.w_3.build((batch_size, max_sequence_len, d_model))
+        enclayer_tf.position_wise_feed_forward_layer.w_3.kernel = w3_pt
+        enclayer_tf.position_wise_feed_forward_layer.w_3.bias = b3_pt
+
+    output_tf = enclayer_tf(input_tensor, None)[0]
+
+    if pt_channel_axis == -1:
+        output_pt = enclayer_pt(torch.from_numpy(input_tensor), None)[0]
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = enclayer_pt(input_tensor, None)[0]
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    # print(output_pt)
+    # print(output_tf)
+
+    print('Are the TransformerEncoder TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy(),
+                                                              rtol=1.e-4, atol=1.e-7))
+
+if check_antheenc:
+    tc_length = 3
+    ratio = .1
+    input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    enclayer_pt = AntheEncoderBlockPT(4, d_model, 4 * d_model, 0.0)
+    enclayer_tf = AntheEncoderBlockTF(4, d_model, 4 * d_model, 0.0)
+
+    # LN 1
+    ln_weight_pt = enclayer_pt.layer_norm_1.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_1.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_1.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_1.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_1.beta.assign(ln_bias_pt)
+
+    # LN 2
+    ln_weight_pt = enclayer_pt.layer_norm_2.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_2.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_2.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_2.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_2.beta.assign(ln_bias_pt)
+
+    # MHA
+    w_q = enclayer_pt.attention.w_query.weight.detach().numpy()
+    b_q = enclayer_pt.attention.w_query.bias.detach().numpy().T
+    w_k = enclayer_pt.attention.w_key.weight.detach().numpy()
+    b_k = enclayer_pt.attention.w_key.bias.detach().numpy().T
+    w_v = enclayer_pt.attention.w_value.weight.detach().numpy()
+    b_v = enclayer_pt.attention.w_value.bias.detach().numpy().T
+
+    w_ff = enclayer_pt.attention.ff.weight.detach().numpy().T
+    b_ff = enclayer_pt.attention.ff.bias.detach().numpy().T
+
+    enclayer_tf.attention.w_query.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.w_key.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.w_value.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.ff.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.attention.w_query.kernel = w_q
+    enclayer_tf.attention.w_query.bias = b_q
+    enclayer_tf.attention.w_key.kernel = w_k
+    enclayer_tf.attention.w_key.bias = b_k
+    enclayer_tf.attention.w_value.kernel = w_v
+    enclayer_tf.attention.w_value.bias = b_v
+    enclayer_tf.attention.ff.kernel = w_ff
+    enclayer_tf.attention.ff.bias = b_ff
+
+    # GEGLU
+    w1_pt = enclayer_pt.position_wise_feed_forward_layer.w_1.weight.detach().numpy()
+    w2_pt = enclayer_pt.position_wise_feed_forward_layer.w_2.weight.detach().numpy()
+
+    b1_pt = enclayer_pt.position_wise_feed_forward_layer.w_1.bias.detach().numpy().T
+    b2_pt = enclayer_pt.position_wise_feed_forward_layer.w_2.bias.detach().numpy().T
+
+    enclayer_tf.position_wise_feed_forward_layer.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.position_wise_feed_forward_layer.w_1.build((batch_size, max_sequence_len, d_model))
+    dff = 2 * 4 * d_model // 3
+    enclayer_tf.position_wise_feed_forward_layer.w_2.build((batch_size, max_sequence_len, dff))
+
+    enclayer_tf.position_wise_feed_forward_layer.w_1.kernel = w1_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_1.bias = b1_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_2.kernel = w2_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_2.bias = b2_pt
+
+    w3_pt = enclayer_pt.position_wise_feed_forward_layer.w_3.weight.detach().numpy()
+    b3_pt = enclayer_pt.position_wise_feed_forward_layer.w_3.bias.detach().numpy().T
+    enclayer_tf.position_wise_feed_forward_layer.w_3.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.position_wise_feed_forward_layer.w_3.kernel = w3_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_3.bias = b3_pt
+
+    output_tf = enclayer_tf(input_tensor, None)[0]
+
+    if pt_channel_axis == -1:
+        output_pt = enclayer_pt(torch.from_numpy(input_tensor), None)[0]
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = enclayer_pt(input_tensor, None)[0]
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    # print(output_pt)
+    # print(output_tf)
+
+    print('Are the AntheEncoder TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy(),
+                                                        rtol=1.e-4, atol=1.e-7))
+
+if check_anthedec:
+    tc_length = 3
+    ratio = .1
+    input_tensor_1 = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    input_tensor_2 = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
+    enclayer_pt = AntheDecoderBlockPT(4, d_model, 4 * d_model, 0.0)
+    enclayer_tf = AntheDecoderBlockTF(4, d_model, 4 * d_model, 0.0)
+
+    # LN 1
+    ln_weight_pt = enclayer_pt.layer_norm_1.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_1.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_1.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_1.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_1.beta.assign(ln_bias_pt)
+
+    # LN 2
+    ln_weight_pt = enclayer_pt.layer_norm_2.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_2.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_2.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_2.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_2.beta.assign(ln_bias_pt)
+
+    # LN 3
+    ln_weight_pt = enclayer_pt.layer_norm_3.weight.detach().numpy()
+    ln_bias_pt = enclayer_pt.layer_norm_3.bias.detach().numpy()
+
+    enclayer_tf.layer_norm_3.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.layer_norm_3.gamma.assign(ln_weight_pt)
+    enclayer_tf.layer_norm_3.beta.assign(ln_bias_pt)
+
+    # MHA
+    w_q = enclayer_pt.attention.w_query.weight.detach().numpy()
+    b_q = enclayer_pt.attention.w_query.bias.detach().numpy().T
+    w_k = enclayer_pt.attention.w_key.weight.detach().numpy()
+    b_k = enclayer_pt.attention.w_key.bias.detach().numpy().T
+    w_v = enclayer_pt.attention.w_value.weight.detach().numpy()
+    b_v = enclayer_pt.attention.w_value.bias.detach().numpy().T
+
+    w_ff = enclayer_pt.attention.ff.weight.detach().numpy().T
+    b_ff = enclayer_pt.attention.ff.bias.detach().numpy().T
+
+    enclayer_tf.attention.w_query.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.w_key.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.w_value.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.attention.ff.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.attention.w_query.kernel = w_q
+    enclayer_tf.attention.w_query.bias = b_q
+    enclayer_tf.attention.w_key.kernel = w_k
+    enclayer_tf.attention.w_key.bias = b_k
+    enclayer_tf.attention.w_value.kernel = w_v
+    enclayer_tf.attention.w_value.bias = b_v
+    enclayer_tf.attention.ff.kernel = w_ff
+    enclayer_tf.attention.ff.bias = b_ff
+
+    # MHA2
+    w_q = enclayer_pt.conditioned_attention.w_query.weight.detach().numpy()
+    b_q = enclayer_pt.conditioned_attention.w_query.bias.detach().numpy().T
+    w_k = enclayer_pt.conditioned_attention.w_key.weight.detach().numpy()
+    b_k = enclayer_pt.conditioned_attention.w_key.bias.detach().numpy().T
+    w_v = enclayer_pt.conditioned_attention.w_value.weight.detach().numpy()
+    b_v = enclayer_pt.conditioned_attention.w_value.bias.detach().numpy().T
+
+    w_ff = enclayer_pt.conditioned_attention.ff.weight.detach().numpy().T
+    b_ff = enclayer_pt.conditioned_attention.ff.bias.detach().numpy().T
+
+    enclayer_tf.conditioned_attention.w_query.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.conditioned_attention.w_key.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.conditioned_attention.w_value.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.conditioned_attention.ff.build((batch_size, max_sequence_len, d_model))
+
+    enclayer_tf.conditioned_attention.w_query.kernel = w_q
+    enclayer_tf.conditioned_attention.w_query.bias = b_q
+    enclayer_tf.conditioned_attention.w_key.kernel = w_k
+    enclayer_tf.conditioned_attention.w_key.bias = b_k
+    enclayer_tf.conditioned_attention.w_value.kernel = w_v
+    enclayer_tf.conditioned_attention.w_value.bias = b_v
+    enclayer_tf.conditioned_attention.ff.kernel = w_ff
+    enclayer_tf.conditioned_attention.ff.bias = b_ff
+
+    # GEGLU
+    w1_pt = enclayer_pt.position_wise_feed_forward_layer.w_1.weight.detach().numpy()
+    w2_pt = enclayer_pt.position_wise_feed_forward_layer.w_2.weight.detach().numpy()
+
+    b1_pt = enclayer_pt.position_wise_feed_forward_layer.w_1.bias.detach().numpy().T
+    b2_pt = enclayer_pt.position_wise_feed_forward_layer.w_2.bias.detach().numpy().T
+
+    enclayer_tf.position_wise_feed_forward_layer.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.position_wise_feed_forward_layer.w_1.build((batch_size, max_sequence_len, d_model))
+    dff = 2 * 4 * d_model // 3
+    enclayer_tf.position_wise_feed_forward_layer.w_2.build((batch_size, max_sequence_len, dff))
+
+    enclayer_tf.position_wise_feed_forward_layer.w_1.kernel = w1_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_1.bias = b1_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_2.kernel = w2_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_2.bias = b2_pt
+
+    w3_pt = enclayer_pt.position_wise_feed_forward_layer.w_3.weight.detach().numpy()
+    b3_pt = enclayer_pt.position_wise_feed_forward_layer.w_3.bias.detach().numpy().T
+    enclayer_tf.position_wise_feed_forward_layer.w_3.build((batch_size, max_sequence_len, d_model))
+    enclayer_tf.position_wise_feed_forward_layer.w_3.kernel = w3_pt
+    enclayer_tf.position_wise_feed_forward_layer.w_3.bias = b3_pt
+
+    output_tf = enclayer_tf(input_tensor_1, input_tensor_2, None, None)[0]
+
+    if pt_channel_axis == -1:
+        output_pt = enclayer_pt(torch.from_numpy(input_tensor_1), torch.from_numpy(input_tensor_2), None, None)[0]
+    else:
+        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
+        output_pt = enclayer_pt(input_tensor, None)[0]
+        output_pt = torch.transpose(output_pt, 1, 2)
+
+    # print(output_pt)
+    # print(output_tf)
+
+    print('Are the AntheDecoder TF == PT?', np.allclose(output_pt.detach().numpy(), output_tf.numpy(),
+                                                        rtol=1.e-4, atol=1.e-7))
