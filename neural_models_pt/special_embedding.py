@@ -116,7 +116,7 @@ class HSoftPOS(nn.Module):
         embd_d = embed_dim - local_d * (2 * n_layers - 1)
 
         if tcembr is None:
-            self.emb = EmbeddingLayer(vocab_size, embd_d, channel_axis=-1)
+            self.emb = EmbeddingLayer(vocab_size, embd_d, axis=-1)
         else:
             self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcembr, tc_length=tclength)
 

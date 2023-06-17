@@ -35,22 +35,22 @@ pt_channel_axis = -1  # 1 or -1
 assert pt_channel_axis in [1, -1]
 comments = ''
 
-check_embeddings = False
-check_softpos = False
-check_conv = False
-check_ln = False
-check_hsoftpos = False
-check_ffn = False
-check_geglu = False
-check_tcdense = False
-check_mha = False
+print('Remember that you still have to check that they match with the masking for both axis')
+check_embeddings = True
+check_softpos = True
+check_conv = True
+check_ln = True
+check_hsoftpos = True
+check_ffn = True
+check_geglu = True
+check_tcdense = True
+check_mha = True
 check_enclayer = False
-check_antheenc = False
+check_antheenc = True
 check_anthedec = True
 
 if check_embeddings:
     sequences = np.random.randint(0, vocab_size, (batch_size, max_sequence_len))
-    print(sequences)
 
     # PT and TF
     embedding_layer_pt = EmbeddingLayerPT(vocab_size, d_model, axis=pt_channel_axis)
@@ -443,7 +443,7 @@ if check_antheenc:
     tc_length = 3
     ratio = .1
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    enclayer_pt = AntheEncoderBlockPT(4, d_model, 4 * d_model, 0.0)
+    enclayer_pt = AntheEncoderBlockPT(4, d_model, 4 * d_model, 0.0, axis=pt_channel_axis)
     enclayer_tf = AntheEncoderBlockTF(4, d_model, 4 * d_model, 0.0)
 
     # LN 1
@@ -532,7 +532,7 @@ if check_anthedec:
     ratio = .1
     input_tensor_1 = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
     input_tensor_2 = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
-    enclayer_pt = AntheDecoderBlockPT(4, d_model, 4 * d_model, 0.0)
+    enclayer_pt = AntheDecoderBlockPT(4, d_model, 4 * d_model, 0.0, axis=pt_channel_axis)
     enclayer_tf = AntheDecoderBlockTF(4, d_model, 4 * d_model, 0.0)
 
     # LN 1
@@ -640,8 +640,9 @@ if check_anthedec:
     if pt_channel_axis == -1:
         output_pt = enclayer_pt(torch.from_numpy(input_tensor_1), torch.from_numpy(input_tensor_2), None, None)[0]
     else:
-        input_tensor = torch.transpose(torch.from_numpy(input_tensor), 1, 2)
-        output_pt = enclayer_pt(input_tensor, None)[0]
+        input_tensor_1 = torch.transpose(torch.from_numpy(input_tensor_1), 1, 2)
+        input_tensor_2 = torch.transpose(torch.from_numpy(input_tensor_2), 1, 2)
+        output_pt = enclayer_pt(input_tensor_1, input_tensor_2, None, None)[0]
         output_pt = torch.transpose(output_pt, 1, 2)
 
     # print(output_pt)

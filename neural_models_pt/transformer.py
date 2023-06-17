@@ -93,7 +93,7 @@ Anthe = lambda *args, **kwargs: Transformer(
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self, attention_head_count, d_model, d_point_wise_ff, dropout_prob, comments=''):
+    def __init__(self, attention_head_count, d_model, d_point_wise_ff, dropout_prob, axis=-1, comments=''):
         super(EncoderLayer, self).__init__()
         self.comments = comments
         # model hyper parameter variables
@@ -101,6 +101,7 @@ class EncoderLayer(nn.Module):
         self.d_model = d_model
         self.d_point_wise_ff = d_point_wise_ff
         self.dropout_prob = dropout_prob
+        self.axis = axis
 
         self.attention = MultiHeadAttention(attention_head_count, d_model, comments)
 
@@ -116,8 +117,11 @@ class EncoderLayer(nn.Module):
         self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
 
     def forward(self, inputs, mask):
+
+        if self.axis == 1:
+            inputs = torch.transpose(inputs, 1, 2)
+
         output, attention = self.attention(inputs, inputs, inputs, mask)
-        print(output)
 
         output = self.dropout_1(output)
         output = self.layer_norm_1(inputs + output)  # residual network
@@ -127,18 +131,22 @@ class EncoderLayer(nn.Module):
         output = self.dropout_2(output)
         output = self.layer_norm_2(output_temp + output)  # residual network
 
+        if self.axis == 1:
+            output = torch.transpose(output, 1, 2)
+            attention = torch.transpose(attention, 1, 2)
+
         return output, attention
 
 
-AntheEncoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob: \
+AntheEncoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob, axis=-1: \
     EncoderLayer(
-        attention_head_count, d_model, d_point_wise_ff, dropout_prob,
+        attention_head_count, d_model, d_point_wise_ff, dropout_prob, axis=axis,
         comments='geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2'
     )
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, attention_head_count, d_model, d_point_wise_ff, dropout_prob, comments=''):
+    def __init__(self, attention_head_count, d_model, d_point_wise_ff, dropout_prob, axis=-1, comments=''):
         super(DecoderLayer, self).__init__()
         self.comments = comments
         # model hyper parameter variables
@@ -146,6 +154,7 @@ class DecoderLayer(nn.Module):
         self.d_model = d_model
         self.d_point_wise_ff = d_point_wise_ff
         self.dropout_prob = dropout_prob
+        self.axis = axis
 
         self.attention = MultiHeadAttention(attention_head_count, d_model, comments)
 
@@ -165,6 +174,11 @@ class DecoderLayer(nn.Module):
         self.layer_norm_3 = nn.LayerNorm(d_model, eps=1e-6)
 
     def forward(self, decoder_inputs, encoder_output, look_ahead_mask, padding_mask):
+
+        if self.axis == 1:
+            decoder_inputs = torch.transpose(decoder_inputs, 1, 2)
+            encoder_output = torch.transpose(encoder_output, 1, 2)
+
         output, attention_1 = self.attention(decoder_inputs, decoder_inputs, decoder_inputs, look_ahead_mask)
         output = self.dropout_1(output)
         query = self.layer_norm_1(decoder_inputs + output)  # residual network
@@ -176,12 +190,18 @@ class DecoderLayer(nn.Module):
         output = self.dropout_3(output)
         output = self.layer_norm_3(encoder_decoder_attention_output + output)  # residual network
 
+
+        if self.axis == 1:
+            output = torch.transpose(output, 1, 2)
+            attention_1 = torch.transpose(attention_1, 1, 2)
+            attention_2 = torch.transpose(attention_2, 1, 2)
+
         return output, attention_1, attention_2
 
 
-AntheDecoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob: \
+AntheDecoderBlock = lambda attention_head_count, d_model, d_point_wise_ff, dropout_prob, axis=-1: \
     DecoderLayer(
-        attention_head_count, d_model, d_point_wise_ff, dropout_prob,
+        attention_head_count, d_model, d_point_wise_ff, dropout_prob, axis=axis,
         comments='geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2'
     )
 
@@ -190,7 +210,7 @@ class PositionWiseFeedForwardLayer(nn.Module):
     def __init__(self, d_point_wise_ff, d_model, comments='', axis=-1):
         super(PositionWiseFeedForwardLayer, self).__init__()
 
-        self.axis=axis
+        self.axis = axis
 
         if 'noffn' in comments:
             self.w_1 = lambda x: x
@@ -255,7 +275,6 @@ class GEGLU(nn.Module):
         x = inputs
         if self.axis == 1:
             x = torch.transpose(x, 1, 2)
-
 
         x1 = self.w_1(x)
         x3 = self.w_3(x)

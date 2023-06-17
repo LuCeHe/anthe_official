@@ -120,7 +120,6 @@ class EncoderLayer(tf.keras.layers.Layer):
 
     def call(self, inputs, mask):
         output, attention = self.attention([inputs, inputs, inputs, mask])
-        print(output)
 
         output = self.dropout_1(output)
         output = self.layer_norm_1(tf.add(inputs, output))  # residual network
