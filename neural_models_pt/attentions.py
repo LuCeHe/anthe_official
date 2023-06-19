@@ -88,8 +88,13 @@ class MultiHeadAttention(nn.Module):
         unorder = np.argsort(list(mixed))
         self.unmixer = lambda x: [x[i] for i in unorder]
 
-    def forward(self, query, key, value, mask=None):
+    def forward(self, query, key, value, mask=None, layer_past=None):
         batch_size = query.size(0)
+
+        if layer_past is not None:
+            past_key, past_value = layer_past
+            key = torch.cat((past_key, key), dim=-2)
+            value = torch.cat((past_value, value), dim=-2)
 
         if self.axis == 1:
             query = torch.transpose(query, 1, 2)
