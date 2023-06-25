@@ -22,8 +22,16 @@ class TCDense(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        self.weight = get_tc_kernel(self.in_features, self.out_features,
-                                                 length=self.tc_length, bond=self.bond, ratio=self.ratio, layer=self)
+        self.weight = get_tc_kernel(
+            self.in_features, self.out_features,
+            length=self.tc_length, bond=self.bond, ratio=self.ratio, return_tensors=True
+        )
+        kernels, es_string = get_tc_kernel(
+            self.in_features, self.out_features,
+            length=self.tc_length, bond=self.bond, ratio=self.ratio, return_tensors=True
+        )
+        self.es_string = es_string
+        self.weights = torch.nn.ParameterList(kernels)
 
         if self.use_bias:
             self.bias = nn.Parameter(torch.zeros(self.out_features), requires_grad=True)
@@ -35,7 +43,10 @@ class TCDense(nn.Module):
         if self.axis == 1:
             x = torch.transpose(x, 1, 2)
 
-        x = torch.matmul(x, self.weight) + self.bias
+        weight = torch.einsum(self.es_string, *self.weights)
+        weight = torch.reshape(weight, (self.nx, self.nf))
+
+        x = torch.matmul(x, weight) + self.bias
 
         if self.axis == 1:
             x = torch.transpose(x, 1, 2)
