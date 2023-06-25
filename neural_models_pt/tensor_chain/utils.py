@@ -96,7 +96,7 @@ def get_three_factors(n):
     assert (int(torch.prod(torch.tensor(result))) == n)
     return result
 
-def get_tc_kernel(input_size, output_size, length, bond, ratio):
+def get_tc_kernel(input_size, output_size, length, bond, ratio, layer):
 
     if bond is None or bond < 1:
         if ratio is None:
@@ -190,9 +190,12 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio):
     else:
         raise ValueError('TC length greater than 4 not implemented')
 
+    layer.params = torch.nn.ParameterList([])
+
     for i in range(len(kernel_dims)):
         w = torch.nn.Parameter(torch.empty(kernel_dims[i]), requires_grad=True)
         torch.nn.init.xavier_uniform_(w, gain=1.)
+        layer.params.append(w)
         kernels.append(w)
 
     kernel = torch.einsum(einsum_string, *kernels)
