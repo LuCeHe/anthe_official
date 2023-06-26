@@ -92,7 +92,7 @@ class SoftPOS(nn.Module):
                     raise ValueError('extend_axis must be -1 or 1')
 
                 spos_select = F.softmax(m, dim=self.extend_axis)
-                _spos = torch.einsum(einsum_string, spos_select, spos)
+                _spos = torch.einsum(einsum_string, spos_select, spos.to(spos_select.device))
 
                 x = torch.cat([x, _spos], dim=self.extend_axis)
 
