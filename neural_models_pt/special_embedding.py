@@ -69,12 +69,10 @@ class SoftPOS(nn.Module):
         if not extend_axis in [1, -1]:
             raise ValueError('extend_axis must be -1 or 1')
 
-        print(factory_kwargs)
-
         if self.n_subpos > 0:
             self.spos = []
             for i in range(self.repeat_subpos):
-                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units, **factory_kwargs))
+                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units))
                 nn.init.orthogonal_(spos)
 
                 self.spos.append(spos)
@@ -124,7 +122,7 @@ class HSoftPOS(nn.Module):
         embd_d = embed_dim - local_d * (2 * n_layers - 1)
 
         if tcembr is None:
-            self.emb = EmbeddingLayer(vocab_size, embd_d, axis=-1, **factory_kwargs)
+            self.emb = EmbeddingLayer(vocab_size, embd_d, axis=-1)
         else:
             self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcembr, tc_length=tclength)
 
@@ -135,11 +133,10 @@ class HSoftPOS(nn.Module):
 
         self.spos, self.convs = nn.ModuleList(), nn.ModuleList()
         for i in range(n_layers):
-            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=1, **factory_kwargs))
+            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=1))
             if i < n_layers - 1:
                 self.convs.append(
-                    conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i,
-                           **factory_kwargs))
+                    conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i))
 
     def forward(self, inputs):
         x = self.emb(inputs)
