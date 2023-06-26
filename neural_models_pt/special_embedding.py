@@ -44,7 +44,7 @@ class EmbeddingLayer(nn.Module):
 
         output = self.embedding(sequences)
         output = output * torch.sqrt(torch.tensor(self.d_model, dtype=torch.float32))
-        pos = positional_encoding(max_sequence_len, self.d_model)
+        pos = positional_encoding(max_sequence_len, self.d_model).to(output.device)
 
         output = output + pos
 
