@@ -72,7 +72,7 @@ class SoftPOS(nn.Module):
         if self.n_subpos > 0:
             self.spos = []
             for i in range(self.repeat_subpos):
-                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units), **factory_kwargs)
+                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units, **factory_kwargs))
                 nn.init.orthogonal_(spos)
 
                 self.spos.append(spos)
