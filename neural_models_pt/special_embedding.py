@@ -69,6 +69,8 @@ class SoftPOS(nn.Module):
         if not extend_axis in [1, -1]:
             raise ValueError('extend_axis must be -1 or 1')
 
+        print(factory_kwargs)
+
         if self.n_subpos > 0:
             self.spos = []
             for i in range(self.repeat_subpos):
@@ -100,11 +102,14 @@ class SoftPOS(nn.Module):
 
 
 class HSoftPOS(nn.Module):
-    def __init__(self, vocab_size, embed_dim, n_layers=2, tcembr=None, tcconvr=None, tclength=2, extend_axis=1):
+    def __init__(self, vocab_size, embed_dim, n_layers=2, tcembr=None, tcconvr=None, tclength=2, extend_axis=1,
+                 device=None, dtype=None):
         super(HSoftPOS, self).__init__()
 
         assert tcembr is None or isinstance(tcembr, float)
         assert tcconvr is None or isinstance(tcconvr, float)
+
+        factory_kwargs = {'device': device, 'dtype': dtype}
 
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
@@ -119,7 +124,7 @@ class HSoftPOS(nn.Module):
         embd_d = embed_dim - local_d * (2 * n_layers - 1)
 
         if tcembr is None:
-            self.emb = EmbeddingLayer(vocab_size, embd_d, axis=-1)
+            self.emb = EmbeddingLayer(vocab_size, embd_d, axis=-1, **factory_kwargs)
         else:
             self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcembr, tc_length=tclength)
 
@@ -130,10 +135,11 @@ class HSoftPOS(nn.Module):
 
         self.spos, self.convs = nn.ModuleList(), nn.ModuleList()
         for i in range(n_layers):
-            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=1))
+            self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1, extend_axis=1, **factory_kwargs))
             if i < n_layers - 1:
                 self.convs.append(
-                    conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i))
+                    conv1d(embd_d if i == 0 else local_d, local_d, self.kernel_size, padding=0, dilation=2 ** i,
+                           **factory_kwargs))
 
     def forward(self, inputs):
         x = self.emb(inputs)
@@ -151,7 +157,6 @@ class HSoftPOS(nn.Module):
             ys.append(y)
 
         x = torch.cat(ys, dim=1)
-
 
         if self.extend_axis == -1:
             x = torch.transpose(x, 1, 2)
