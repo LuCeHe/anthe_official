@@ -142,15 +142,21 @@ class HSoftPOS(nn.Module):
         x = self.emb(inputs)
         x = torch.transpose(x, 1, 2)
 
+        print(x.device)
+
         xs = [x]
         for i, conv in enumerate(self.convs):
             x = torch.nn.functional.pad(x, ((self.kernel_size - 1) * (2 ** i), 0, 0, 0))
+            print(x.device)
+
             x = conv(x)
             xs.append(x)
 
         ys = []
         for x, spos in zip(xs, self.spos):
             y = spos(x)
+            print(y.device)
+
             ys.append(y)
 
         x = torch.cat(ys, dim=1)
