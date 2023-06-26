@@ -142,12 +142,12 @@ class HSoftPOS(nn.Module):
         x = self.emb(inputs)
         x = torch.transpose(x, 1, 2)
 
-        print(x.device)
+        print(-1, x.device)
 
         xs = [x]
         for i, conv in enumerate(self.convs):
             x = torch.nn.functional.pad(x, ((self.kernel_size - 1) * (2 ** i), 0, 0, 0))
-            print(x.device)
+            print(i, x.device)
 
             x = conv(x)
             xs.append(x)
@@ -164,6 +164,7 @@ class HSoftPOS(nn.Module):
         if self.extend_axis == -1:
             x = torch.transpose(x, 1, 2)
 
+        print('nice!')
         return x
 
 
