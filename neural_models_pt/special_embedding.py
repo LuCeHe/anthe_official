@@ -30,13 +30,14 @@ def angle(pos, index, d_model):
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, vocab_size, d_model, axis=-1):
+    def __init__(self, vocab_size, d_model, axis=-1,
+                 device=None, dtype=None):
         super(EmbeddingLayer, self).__init__()
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.axis = axis
 
-        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model, device=device, dtype=dtype)
 
     def forward(self, sequences):
         max_sequence_len = sequences.shape[1]
@@ -54,8 +55,10 @@ class EmbeddingLayer(nn.Module):
 
 
 class SoftPOS(nn.Module):
-    def __init__(self, add_units, n_subpos=3, repeat_subpos=2, initializer='orthogonal', extend_axis=-1):
+    def __init__(self, add_units, n_subpos=3, repeat_subpos=2, initializer='orthogonal', extend_axis=-1,
+                 device=None, dtype=None):
         super(SoftPOS, self).__init__()
+        factory_kwargs = {'device': device, 'dtype': dtype}
 
         self.add_units = add_units
         self.n_subpos = n_subpos
@@ -69,7 +72,7 @@ class SoftPOS(nn.Module):
         if self.n_subpos > 0:
             self.spos = []
             for i in range(self.repeat_subpos):
-                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units))
+                spos = nn.Parameter(torch.Tensor(self.n_subpos, self.add_units), **factory_kwargs)
                 nn.init.orthogonal_(spos)
 
                 self.spos.append(spos)
