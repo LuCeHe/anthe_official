@@ -169,7 +169,7 @@ def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, 
         tcr = str2val(comments, 'tcemb', float, default=.2)
         emb = lambda vocab, embd: TCEmbedding(vocab, embd, ratio=tcr, tc_length=tclength)
 
-    if 'layerhspos' in comments:
+    if 'hsoftpos' in comments:
         n = str2val(comments, 'layerhspos', output_type=int, default=3)
 
         tclength = str2val(comments, 'tclength', int, default=2)
