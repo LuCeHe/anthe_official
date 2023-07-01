@@ -23,15 +23,15 @@ class TCEmbedding(tf.keras.layers.Embedding):
     def __init__(self, input_dim, output_dim, tc_length=3, bond=None, ratio=None, **kwargs):
         super().__init__(input_dim, output_dim, **kwargs)
 
-        self._input_size = int(input_dim)
-        self._output_size = int(output_dim)
-        self._length = int(tc_length)
-        self._bond = bond
-        self._ratio = ratio
+        self.input_size = int(input_dim)
+        self.output_size = int(output_dim)
+        self.length = int(tc_length)
+        self.bond = bond
+        self.ratio = ratio
 
     def build(self, input_shape=None):
-        self.embeddings = get_tc_kernel(self, self._input_size, self._output_size,
-                                         length=self._length, bond=self._bond, ratio=self._ratio, name=self._name,
+        self.embeddings = get_tc_kernel(self, self.input_size, self.output_size,
+                                         length=self.length, bond=self.bond, ratio=self.ratio, name=self._name,
                                          initializer=self.embeddings_initializer,
                                          regularizer=self.embeddings_regularizer,
                                          constraint=self.embeddings_constraint)
@@ -40,9 +40,11 @@ class TCEmbedding(tf.keras.layers.Embedding):
 
     def get_config(self):
         config = {
-            "bond": self._bond,
-            "ratio": self._ratio,
-            "length": self._length,
+            "bond": self.bond,
+            "ratio": self.ratio,
+            "length": self.length,
+            "input_size": input_size,
+            "output_size": output_size,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

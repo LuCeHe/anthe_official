@@ -21,9 +21,9 @@ class TCDense(tf.keras.layers.Dense):
     def __init__(self, units, tc_length=3, bond=None, ratio=None, **kwargs):
         super().__init__(units, **kwargs)
 
-        self._bond = bond
-        self._ratio = ratio
-        self._length = int(tc_length)
+        self.bond = bond
+        self.ratio = ratio
+        self.length = int(tc_length)
 
         self.supports_masking = True
 
@@ -45,7 +45,7 @@ class TCDense(tf.keras.layers.Dense):
             )
 
         self.kernel = get_tc_kernel(self, int(last_dim), int(self.units),
-                                     length=self._length, bond=self._bond, ratio=self._ratio, name=self._name,
+                                     length=self.length, bond=self.bond, ratio=self.ratio, name=self._name,
                                      initializer=self.kernel_initializer, regularizer=self.kernel_regularizer,
                                      constraint=self.kernel_constraint)
 
@@ -67,8 +67,9 @@ class TCDense(tf.keras.layers.Dense):
 
     def get_config(self):
         config = {
-            "bond": self._bond,
-            "ratio": self._ratio,
+            "bond": self.bond,
+            "ratio": self.ratio,
+            "length": self.length,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))

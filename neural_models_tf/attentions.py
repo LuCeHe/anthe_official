@@ -11,6 +11,13 @@ class ScaledDotProductAttention(tf.keras.layers.Layer):
         super().__init__()
         self.d_h = d_h
         self.softmax = tf.nn.softmax
+        
+    def get_config(self):
+        config = {
+            'd_h': self.d_h,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
     def call(self, query, key, value, mask=None):
         matmul_q_and_transposed_k = tf.matmul(query, key, transpose_b=True)
@@ -38,50 +45,51 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         # model hyper parameter variables
         self.comments = comments
         self.attention_head_count = attention_head_count
+        self.d_model = d_model
 
-        if d_model % attention_head_count != 0:
+        if self.d_model % self.attention_head_count != 0:
             raise ValueError(
                 "d_model({}) % attention_head_count({}) is not zero.d_model must be multiple of attention_head_count.".format(
-                    d_model, attention_head_count
+                    self.d_model, self.attention_head_count
                 )
             )
 
-        self.d_h = d_model // attention_head_count
+        self.d_h = self.d_model // self.attention_head_count
 
-        if 'nopreatt' in comments:
+        if 'nopreatt' in self.comments:
             w_query = lambda x: x
             w_key = lambda x: x
             w_value = lambda x: x
 
-        elif 'sharedqkv' in comments:
-            dense = tf.keras.layers.Dense(d_model)
+        elif 'sharedqkv' in self.comments:
+            dense = tf.keras.layers.Dense(self.d_model)
             w_query, w_key, w_value = [dense] * 3
 
-        elif 'tclayer' in comments or 'tcpreatt' in comments:
-            tcr = str2val(comments, 'tcpreatt', float, default=.2)
-            tcr = str2val(comments, 'tclayer', float, default=tcr)
-            tclength = str2val(comments, 'tclength', int, default=3)
-            tclength = str2val(comments, 'tclayerlength', int, default=tclength)
+        elif 'tclayer' in self.comments or 'tcpreatt' in self.comments:
+            tcr = str2val(self.comments, 'tcpreatt', float, default=.2)
+            tcr = str2val(self.comments, 'tclayer', float, default=tcr)
+            tclength = str2val(self.comments, 'tclength', int, default=3)
+            tclength = str2val(self.comments, 'tclayerlength', int, default=tclength)
 
-            w_query = TCDense(d_model, tc_length=tclength, ratio=tcr)
-            w_key = TCDense(d_model, tc_length=tclength, ratio=tcr)
-            w_value = TCDense(d_model, tc_length=tclength, ratio=tcr)
+            w_query = TCDense(self.d_model, tc_length=tclength, ratio=tcr)
+            w_key = TCDense(self.d_model, tc_length=tclength, ratio=tcr)
+            w_value = TCDense(self.d_model, tc_length=tclength, ratio=tcr)
 
         else:
-            w_query = tf.keras.layers.Dense(d_model)
-            w_key = tf.keras.layers.Dense(d_model)
-            w_value = tf.keras.layers.Dense(d_model)
+            w_query = tf.keras.layers.Dense(self.d_model)
+            w_key = tf.keras.layers.Dense(self.d_model)
+            w_value = tf.keras.layers.Dense(self.d_model)
 
         self.w_query = w_query
         self.w_key = w_key
         self.w_value = w_value
 
         self.scaled_dot_product = ScaledDotProductAttention(self.d_h)
-        self.ff = tf.keras.layers.Dense(d_model)
+        self.ff = tf.keras.layers.Dense(self.d_model)
 
-        self.d_model = d_model
+        #self.d_model = d_model
 
-        qkv_order = str2val(comments, 'gateattention', str, default='kqv')
+        qkv_order = str2val(self.comments, 'gateattention', str, default='kqv')
         assert all([k in qkv_order for k in 'qkv'])
 
         order = np.argsort(list(qkv_order))
@@ -90,6 +98,16 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         mixed = self.mixer(list('abc'))
         unorder = np.argsort(list(mixed))
         self.unmixer = lambda x: [x[i] for i in unorder]
+        
+        
+    def get_config(self):
+        config = {
+            'd_model': self.d_model,
+            'attention_head_count' : self.attention_head_count,
+            'comments' : self.comments
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
     def call(self, inputs):
         query, key, value, mask = inputs

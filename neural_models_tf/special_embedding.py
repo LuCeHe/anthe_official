@@ -34,7 +34,17 @@ class EmbeddingLayer(tf.keras.layers.Layer):
         self.vocab_size = vocab_size
         self.d_model = d_model
 
-        self.embedding = tf.keras.layers.Embedding(vocab_size, d_model)
+        self.embedding = tf.keras.layers.Embedding(self.vocab_size, self.d_model)
+        
+        
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "vocab_size": self.vocab_size,
+            "d_model": self.d_model,
+        })
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
     def call(self, sequences, **kwargs):
         max_sequence_len = tf.shape(sequences)[1]
@@ -56,6 +66,18 @@ class SoftPOS(tf.keras.layers.Layer):
         self.n_subpos = n_subpos
         self.repeat_subpos = repeat_subpos
         self.initializer = initializer
+        
+    def get_config(self):
+
+        config = {
+            'add_units': self.add_units,
+            'n_subpos': self.n_subpos,
+            'repeat_subpos': self.repeat_subpos,
+            'initializer': self.initializer,
+        }
+
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
     def build(self, input_shape):
         if self.n_subpos > 0:
@@ -80,22 +102,19 @@ class SoftPOS(tf.keras.layers.Layer):
 
         return x
 
-    def get_config(self):
-        config = {
-            'add_units': self.add_units, 'n_subpos': self.n_subpos, 'repeat_subpos': self.repeat_subpos,
-            'initializer': tf.keras.initializers.serialize(tf.keras.initializers.get(self.embeddings_initializer)),
-        }
+    #def get_config(self):
+    #    config = {
+    #        'add_units': self.add_units, 'n_subpos': self.n_subpos, 'repeat_subpos': self.repeat_subpos,
+    #        'initializer': tf.keras.initializers.serialize(tf.keras.initializers.get(self.embeddings_initializer)),
+    #    }
 
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+    #    base_config = super().get_config()
+    #    return dict(list(base_config.items()) + list(config.items()))
 
 
 class HSoftPOS(tf.keras.layers.Layer):
     def __init__(self, vocab_size, embed_dim, n_layers=2, tcembr=None, tcconvr=None, tclength=2, **kwargs):
         super().__init__(**kwargs)
-
-        assert tcembr is None or isinstance(tcembr, float)
-        assert tcconvr is None or isinstance(tcconvr, float)
 
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
@@ -103,24 +122,41 @@ class HSoftPOS(tf.keras.layers.Layer):
         self.tcembr = tcembr
         self.tcconvr = tcconvr
         self.tclength = tclength
+        
+        assert self.tcembr is None or isinstance(self.tcembr, float)
+        assert self.tcconvr is None or isinstance(self.tcconvr, float)
 
-        local_d = int(embed_dim / 2 / n_layers)
-        embd_d = embed_dim - local_d * (2 * n_layers - 1)
+        local_d = int(self.embed_dim / 2 / self.n_layers)
+        embd_d = self.embed_dim - local_d * (2 * self.n_layers - 1)
 
-        if tcembr is None:
-            self.emb = EmbeddingLayer(vocab_size, embd_d)
+        if self.tcembr is None:
+            self.emb = EmbeddingLayer(self.vocab_size, embd_d)
         else:
-            self.emb = TCEmbedding(vocab_size, embd_d, ratio=tcembr, tc_length=tclength)
+            self.emb = TCEmbedding(self.vocab_size, embd_d, ratio=self.tcembr, tc_length=self.tclength)
 
-        if tcconvr is None:
+        if self.tcconvr is None:
             conv1d = tf.keras.layers.Conv1D
         else:
-            conv1d = lambda *args, **kwargs: TCConv1D(*args, **kwargs, ratio=tcconvr, tc_length=tclength)
+            conv1d = lambda *args, **kwargs: TCConv1D(*args, **kwargs, ratio=self.tcconvr, tc_length=self.tclength)
 
         self.spos, self.convs = [], []
         for i in range(n_layers):
             self.spos.append(SoftPOS(local_d, n_subpos=local_d, repeat_subpos=1))
             if i < n_layers - 1: self.convs.append(conv1d(local_d, 3, padding='causal', dilation_rate=2 ** i))
+                
+    def get_config(self):
+
+        config = {
+            'vocab_size' : self.vocab_size,
+            'embed_dim' : self.embed_dim,
+            'n_layers' : self.n_layers,
+            'tcembr' : self.tcembr,
+            'tcconvr' : self.tcconvr,
+            'tclength' : self.tclength,
+        }
+
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
     def call(self, inputs):
         x = self.emb(inputs)
@@ -138,20 +174,6 @@ class HSoftPOS(tf.keras.layers.Layer):
         x = tf.concat(ys, axis=-1)
 
         return x
-
-    def get_config(self):
-
-        config = {
-            'vocab_size': self.vocab_size,
-            'embed_dim': self.embed_dim,
-            'n_layers': self.n_layers,
-            'tcembr': self.tcembr,
-            'tcconvr': self.tcconvr,
-            'tclength': self.tclength,
-        }
-
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
 
 
 def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, d_model):
