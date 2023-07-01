@@ -96,7 +96,7 @@ def get_three_factors(n):
     assert (int(torch.prod(torch.tensor(result))) == n)
     return result
 
-def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=False):
+def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=False,expand=False,tranpose=False):
 
     if bond is None or bond < 1:
         if ratio is None:
@@ -115,7 +115,9 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=F
         kernel_dims = [[input_dims[0], bond, output_dims[0]],
                        [input_dims[1], bond, output_dims[1]]]
 
-        einsum_string = 'ijk,ljr->ilkr'
+        einsum_string = 'ijk,ljr->ilkr' 
+        einsum_string_exp = 'bsij,ijk,ljr->bskr'
+        enisum_strin_exp_tr = 'bskr,ijk,ljr->bsij'
 
         true_ratio = input_size * output_size / bond / (
                 input_dims[0] * output_dims[0]
@@ -137,6 +139,8 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=F
                        [input_dims[1], bond, bond, output_dims[1]], [input_dims[2], bond, output_dims[2]]]
 
         einsum_string = 'ijk,ljmr,smp->ilskrp'
+        einsum_string_exp = 'btils,ijk,ljmr,smp->btkrp'
+        einsum_string_exp_tr = 'btkrp,ijk,ljmr,smp->btils'
 
         true_ratio = input_size * output_size / bond / (
                 input_dims[0] * output_dims[0]
@@ -161,6 +165,8 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=F
                        [input_dims[3], bond, output_dims[3]]]
 
         einsum_string = 'ijk,ljmr,smop,tof->ilstkrpf'
+        einsum_string_exp = 'bqilst,ijk,ljmr,smop,tof->bqkrpf'
+        einsum_string_exp_tr = 'bqkrpf,ijk,ljmr,smop,tof->bqilst'
 
         true_ratio = input_size * output_size / bond / (
                 input_dims[0] * output_dims[0]
@@ -185,6 +191,10 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=F
                        [input_dims[1], bond, bond, output_dims[1]], [input_dims[2], bond, output_dims[2]]]
 
         einsum_string = 'ijk,ljmr,smp->ilskrp'
+        einsum_string_exp = 'btils,ijk,ljmr,smp->btkrp'
+        einsum_string_exp_tr = 'btkrp,ijk,ljmr,smp->btils'
+
+
 
     else:
         raise ValueError('TC length greater than 4 not implemented')
@@ -201,4 +211,11 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=F
 
         return kernel
     else:
-        return kernels, einsum_string
+        if not expand:
+            return kernels, einsum_string
+        else:
+            if tranpose:
+                return kernels, einsum_string_exp_tr
+            else:
+                return kernels, einsum_string_exp
+
