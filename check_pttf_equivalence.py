@@ -45,7 +45,7 @@ check_ffn = True
 check_geglu = True
 check_tcdense = True
 check_mha = True
-check_enclayer = False
+check_enclayer = True
 check_antheenc = True
 check_anthedec = True
 
@@ -353,6 +353,7 @@ if check_enclayer:
     ratio = .1
     input_tensor = np.random.rand(batch_size, max_sequence_len, d_model).astype('float32')
     comments = 'geglu_gateattention'  # geglu
+    comments = ''  # geglu
     # comments = ''  # geglu
     enclayer_pt = EncoderLayerPT(4, d_model, 4 * d_model, 0.0, comments)
     enclayer_tf = EncoderLayerTF(4, d_model, 4 * d_model, 0.0, comments)

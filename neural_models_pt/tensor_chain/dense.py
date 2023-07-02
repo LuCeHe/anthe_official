@@ -24,7 +24,7 @@ class TCDense(nn.Module):
     def reset_parameters(self):
         self.weight = get_tc_kernel(
             self.in_features, self.out_features,
-            length=self.tc_length, bond=self.bond, ratio=self.ratio, return_tensors=True
+            length=self.tc_length, bond=self.bond, ratio=self.ratio
         )
         kernels, es_string = get_tc_kernel(
             self.in_features, self.out_features,
@@ -44,7 +44,7 @@ class TCDense(nn.Module):
             x = torch.transpose(x, 1, 2)
 
         weight = torch.einsum(self.es_string, *self.weights)
-        weight = torch.reshape(weight, (self.nx, self.nf))
+        weight = torch.reshape(weight, (self.in_features, self.out_features))
 
         x = torch.matmul(x, weight) + self.bias
 
