@@ -19,7 +19,6 @@ def factors(n):
                 break
 
 def get_two_factors(n):
-    term1 = 1
     factor_list = list(factors(n))
     ln = len(factor_list)
     if ln == 2:
@@ -117,7 +116,7 @@ def get_tc_kernel(input_size, output_size, length, bond, ratio, return_tensors=F
 
         einsum_string = 'ijk,ljr->ilkr' 
         einsum_string_exp = 'bsij,ijk,ljr->bskr'
-        enisum_strin_exp_tr = 'bskr,ijk,ljr->bsij'
+        enisum_string_exp_tr = 'bskr,ijk,ljr->bsij'
 
         true_ratio = input_size * output_size / bond / (
                 input_dims[0] * output_dims[0]
