@@ -22,16 +22,16 @@ class TCDense(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        self.weight = get_tc_kernel(
-            self.in_features, self.out_features,
-            length=self.tc_length, bond=self.bond, ratio=self.ratio
-        )
-        kernels, es_string = get_tc_kernel(
+        # self.weight = get_tc_kernel(
+        #     self.in_features, self.out_features,
+        #     length=self.tc_length, bond=self.bond, ratio=self.ratio
+        # )
+        self.kernels, es_string = get_tc_kernel(
             self.in_features, self.out_features,
             length=self.tc_length, bond=self.bond, ratio=self.ratio, return_tensors=True
         )
         self.es_string = es_string
-        self.weights = torch.nn.ParameterList(kernels)
+        self.weights = torch.nn.ParameterList(self.kernels)
 
         if self.use_bias:
             self.bias = nn.Parameter(torch.zeros(self.out_features), requires_grad=True)
