@@ -3,9 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from pyaromatics.stay_organized.utils import str2val
-from anthe_official.neural_models_pt.tensor_chain.convolutions import TCConv1D
-
-from anthe_official.neural_models_pt.tensor_chain.embedding import TCEmbedding
+# from anthe_official.neural_models_pt.tensor_chain.convolutions import TCConv1D
+# from anthe_official.neural_models_pt.tensor_chain.embedding import TCEmbedding
 
 import torch
 
