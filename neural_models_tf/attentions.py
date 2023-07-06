@@ -87,9 +87,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.scaled_dot_product = ScaledDotProductAttention(self.d_h)
         self.ff = tf.keras.layers.Dense(self.d_model)
 
-        #self.d_model = d_model
-
-        qkv_order = str2val(self.comments, 'gateattention', str, default='kqv')
+        qkv_order = str2val(self.comments, 'gateattention', str, default='qkv')
         assert all([k in qkv_order for k in 'qkv'])
 
         order = np.argsort(list(qkv_order))

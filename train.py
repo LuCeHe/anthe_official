@@ -56,17 +56,15 @@ def get_args():
     parser.add_argument("--save_best", default=1, type=int, help="whether to save best model 1/0 -> True/False")
     args = parser.parse_args()
 
-    EXPERIMENT = os.path.join(args.results_dir, time_string + random_string)
-    args.experiment_dir = EXPERIMENT
-    os.makedirs(EXPERIMENT, exist_ok=True)
+    name_exp = time_string + random_string + '--antheofficial'
+    args.experiment_dir = os.path.join(args.results_dir, name_exp)
+    os.makedirs(args.experiment_dir, exist_ok=True)
 
-    MODEL = os.path.join(args.checkpoint_dir, time_string + random_string)
-    args.ckpt_dir = MODEL
-    os.makedirs(MODEL, exist_ok=True)
+    args.ckpt_dir = os.path.join(args.checkpoint_dir, name_exp + '--ckpt')
+    os.makedirs(args.ckpt_dir, exist_ok=True)
 
-    MODEL = os.path.join(CKPT_BEST, time_string + random_string)
-    args.ckpt_best_dir = MODEL
-    os.makedirs(MODEL, exist_ok=True)
+    args.ckpt_best_dir = os.path.join(CKPT_BEST, name_exp + '--ckpt-best')
+    os.makedirs(args.ckpt_best_dir, exist_ok=True)
 
     return args
 
