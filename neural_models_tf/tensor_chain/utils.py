@@ -105,7 +105,7 @@ def get_three_factors(n):
 
 
 def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
-                   initializer, regularizer, constraint):
+                   initializer, regularizer, constraint, return_tensors_and_einsum_string=False):
     # random_string = ''.join([str(r) for r in np.random.choice(10, 4)])
     # name = name + '_' + random_string
 
@@ -209,7 +209,10 @@ def get_tc_kernel(self, input_size, output_size, length, bond, ratio, name,
                                        initializer=initializer, regularizer=regularizer,
                                        constraint=constraint, trainable=True, dtype=self.dtype))
 
-    kernel = tf.einsum(einsum_string, *kernels)
-    kernel = tf.reshape(kernel, [input_size, output_size])
+    if not return_tensors_and_einsum_string:
+        kernel = tf.einsum(einsum_string, *kernels)
+        kernel = tf.reshape(kernel, [input_size, output_size])
 
-    return kernel
+        return kernel
+    else:
+        return kernels, einsum_string
