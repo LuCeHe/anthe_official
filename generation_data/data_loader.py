@@ -176,8 +176,8 @@ class DataLoader:
         t_numpy_val = f['t_numpy_val'][:]
         f.close()
 
-        train_dataset = self.create_dataset(s_numpy_train, t_numpy_train)
-        val_dataset = self.create_dataset(s_numpy_val, t_numpy_val)
+        train_dataset = self.create_dataset(s_numpy_train, t_numpy_train, shuffle=True)
+        val_dataset = self.create_dataset(s_numpy_val, t_numpy_val, shuffle=False)
         return train_dataset, val_dataset
 
     def load_test(self, index=0, custom_dataset=False):
@@ -382,12 +382,17 @@ class DataLoader:
         )
         return source_numpy, target_numpy
 
-    def create_dataset(self, source_numpy, target_numpy):
+    def create_dataset(self, source_numpy, target_numpy, shuffle=True):
 
         buffer_size = int(source_numpy.shape[0] * 0.3)
-        dataset = tf.data.Dataset.from_tensor_slices(
-            (source_numpy, target_numpy)
-        ).shuffle(buffer_size)
+        if shuffle:
+            dataset = tf.data.Dataset.from_tensor_slices(
+                (source_numpy, target_numpy)
+            ).shuffle(buffer_size)
+        else:
+            dataset = tf.data.Dataset.from_tensor_slices(
+                (source_numpy, target_numpy)
+            )
         dataset = dataset.batch(self.BATCH_SIZE)
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
 
