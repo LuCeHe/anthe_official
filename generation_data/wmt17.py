@@ -173,7 +173,11 @@ class WMT17(tf.keras.utils.Sequence):
             fidx = index // self.RAM_samples
 
             dataset = load_from_disk(self.preprocessed_data_path, keep_in_memory=False)[self.data_split]
-            dataset = dataset.select(range(fidx * self.RAM_samples, (fidx + 1) * self.RAM_samples)).shuffle(seed=42)
+            dataset = dataset.select(range(fidx * self.RAM_samples, (fidx + 1) * self.RAM_samples))
+
+            if not self.data_split in ['validation', 'test']:
+                dataset = dataset.shuffle(seed=42)
+
 
             del self.dsf_l1, self.dsf_l2
             self.dsf_l1 = np.array(dataset[self.l1])
