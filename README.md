@@ -56,6 +56,13 @@ soft_pos = SoftPOS(add_units, n_subpos=add_units, repeat_subpos=1)
 hsoft_pos = HSoftPOS(vocab_size, embed_dim)
 ```
 
+### Load pretrained weights
+
+
+You can find pretrained weights [here](https://drive.google.com/file/d/1Y0nhuscVrfyAGhkYahOeCorBGSX0DmzX/view?usp=drive_link).
+Save the folders inside the directory ```work/data/anthe_models``` and use the script ```load_anthe.py``` to
+confirm their performance.
+
 
 ### Acknowledgements
 
