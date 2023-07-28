@@ -71,7 +71,7 @@ model = build_model(
     comments=comments
 )
 
-model.load_weights(path)
+model.load_weights(weights_path)
 model.compile(
     loss=tf.losses.SparseCategoricalCrossentropy(from_logits=True),
     optimizer='SGD',
