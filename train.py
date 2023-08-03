@@ -41,7 +41,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--comments",
-        default='layerhspos:2',
+        default='geglu_gateattention_tcemb:.2_tclength:2',
         type=str, help="String to activate extra behaviors")
     parser.add_argument("--seed", default=39, type=int, help="Random seed")
     parser.add_argument("--epochs", default=3, type=int, help="Epochs")
