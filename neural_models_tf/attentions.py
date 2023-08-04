@@ -32,7 +32,7 @@ class ScaledDotProductAttention(tf.keras.layers.Layer):
 
 
 def gatingmech(x, y, z, wq=None, wk=None, wv=None):
-    print('inside gatingmech')
+    # print('inside gatingmech')
     # print('x', x.shape)
     # print('y', y.shape)
     if not x.shape == y.shape:
@@ -46,6 +46,10 @@ def gatingmech(x, y, z, wq=None, wk=None, wv=None):
             repeats = 2 + ty // tx
             x = tf.concat(repeats*[x], axis=1)
             x = x[:, :ty, :]
+
+            z = tf.concat(repeats*[z], axis=1)
+            z = z[:, :ty, :]
+            # print('inside', x.shape, y.shape, z.shape)
 
 
     x = x * tf.nn.sigmoid(wq(y))
@@ -145,11 +149,6 @@ class MultiHeadAttention(tf.keras.layers.Layer):
             ty = query.shape[2]
             key = key[:, :, :ty, :]
             mask = mask[:, :, :, :ty]
-
-        print('query', query.shape)
-        print('key', key.shape)
-        print('value', value.shape)
-        print('mask', mask.shape)
 
         output, attention = self.scaled_dot_product(query, key, value, mask)
         output = self.concat_head(output, batch_size)

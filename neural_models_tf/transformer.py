@@ -11,7 +11,8 @@ from anthe_official.neural_models_tf.special_embedding import select_embedding_t
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class Transformer(tf.keras.Model):
+# class Transformer(tf.keras.Model):
+class Transformer:
     def __init__(self,
                  inputs_vocab_size,
                  target_vocab_size,
@@ -88,10 +89,10 @@ class Transformer(tf.keras.Model):
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
-    def call(self, inputs, target, inputs_padding_mask, look_ahead_mask, target_padding_mask, training=False):
-        # source, target, inputs_padding_mask, look_ahead_mask, target_padding_mask = inputs
+    def __call__(self, inputs, training=False):
+        source, target, inputs_padding_mask, look_ahead_mask, target_padding_mask = inputs
 
-        source = self.encoder_embedding_layer(inputs)
+        source = self.encoder_embedding_layer(source)
         encoder_tensor = self.encoder_embedding_dropout(source)
         target = self.decoder_embedding_layer(target)
         decoder_tensor = self.decoder_embedding_dropout(target)
@@ -364,8 +365,8 @@ def build_model(
     look_ahead_mask = tf.keras.layers.Input((1, None, None,))
     target_padding_mask = tf.keras.layers.Input((1, 1, None,))
 
-    # output = transformer([inputs_layer, target_layer, inputs_padding_mask, look_ahead_mask, target_padding_mask])
-    output = transformer(inputs_layer, target_layer, inputs_padding_mask, look_ahead_mask, target_padding_mask)
+    output = transformer([inputs_layer, target_layer, inputs_padding_mask, look_ahead_mask, target_padding_mask])
+    # output = transformer(inputs_layer, target_layer, inputs_padding_mask, look_ahead_mask, target_padding_mask)
 
     model = tf.keras.models.Model(
         [inputs_layer, target_layer, inputs_padding_mask, look_ahead_mask, target_padding_mask],

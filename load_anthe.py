@@ -16,19 +16,19 @@ ANTHE_DIR = os.path.abspath(os.path.join(CDIR, '..', 'data', 'anthe_models'))
 # -> sparse_perplexity:  vs 1.2633038759231567
 # 1.3420/1.3420
 config_path = os.path.join(ANTHE_DIR, '2023-07-07--16-19-29--01622--antheofficial', 'results.txt')
-weights_path = os.path.join(ANTHE_DIR, '2023-07-07--16-19-29--01622--antheofficial--ckpt_best', 'best_model.h5')
+weights_path = os.path.join(ANTHE_DIR, '2023-07-07--16-19-29--01622--antheofficial--ckpt-best', 'best_model.h5')
 
 # "comments": "geglu_gateattention_hsoftpos:2_tcffn:.005_tcpreatt:.07_tclength:2",
 # -> sparse_perplexity:  vs 1.2670365571975708
 # 1.3511/1.3511
 config_path = os.path.join(ANTHE_DIR, '2023-07-07--16-19-38--54384--antheofficial', 'results.txt')
-weights_path = os.path.join(ANTHE_DIR, '2023-07-07--16-19-38--54384--antheofficial--ckpt_best', 'best_model.h5')
+weights_path = os.path.join(ANTHE_DIR, '2023-07-07--16-19-38--54384--antheofficial--ckpt-best', 'best_model.h5')
 
 # "comments": "geglu_gegluact:swish_gateattention_hsoftpos:2_tcffn:.1_tclength:2",
 # -> sparse_perplexity:  vs 1.263352870941162,
 # 1.3449/1.3449
 config_path = os.path.join(ANTHE_DIR, '2023-07-07--16-24-26--76134--antheofficial', 'results.txt')
-weights_path = os.path.join(ANTHE_DIR, '2023-07-07--16-24-26--76134--antheofficial--ckpt_best', 'best_model.h5')
+weights_path = os.path.join(ANTHE_DIR, '2023-07-07--16-24-26--76134--antheofficial--ckpt-best', 'best_model.h5')
 
 # Read JSON file
 with open(config_path) as data_file:

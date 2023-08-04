@@ -184,8 +184,8 @@ def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, 
         tcr = str2val(comments, 'tcemb', float, default=.2)
         emb = lambda vocab, embd: TCEmbedding(vocab, embd, ratio=tcr, tc_length=tclength)
 
-    if 'layerhspos' in comments:
-        n = str2val(comments, 'layerhspos', output_type=int, default=2)
+    if 'hsoftpos' in comments:
+        n = str2val(comments, 'hsoftpos', output_type=int, default=2)
 
         local_d = int(d_model / 2 / n)
         embd_d = d_model - local_d * (2 * n - 1)
@@ -245,8 +245,8 @@ def select_embedding_type(self, comments, inputs_vocab_size, target_vocab_size, 
         self.encoder_embedding_layer = lambda x, mode='embedding': code(x, eemb, econvs, espos, mode)
         self.decoder_embedding_layer = lambda x, mode='embedding': code(x, demb, dconvs, dspos, mode)
 
-    elif 'hsoftpos' in comments:
-        n = str2val(comments, 'hsoftpos', output_type=int, default=2)
+    elif 'layerhspos' in comments:
+        n = str2val(comments, 'layerhspos', output_type=int, default=2)
 
         tclength = str2val(comments, 'tclength', int, default=2)
         tcembr, tcconvr = None, None
