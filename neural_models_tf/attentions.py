@@ -27,8 +27,8 @@ class ScaledDotProductAttention(tf.keras.layers.Layer):
             scaled_attention_score += (mask * -1e9)
 
         attention_weight = self.softmax(scaled_attention_score)
-        print('attention_weight', attention_weight.shape)
-        print('value', value.shape)
+        # print('attention_weight', attention_weight.shape)
+        # print('value', value.shape)
         return tf.matmul(attention_weight, value), attention_weight
 
 
