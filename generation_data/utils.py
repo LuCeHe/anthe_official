@@ -24,7 +24,7 @@ class Mask:
     @classmethod
     def create_masks(cls, inputs, target):
         encoder_padding_mask = Mask.create_padding_mask(inputs)
-        decoder_padding_mask = Mask.create_padding_mask(inputs)
+        decoder_padding_mask = Mask.create_padding_mask(target)
 
         look_ahead_mask = tf.maximum(
             Mask.create_look_ahead_mask(tf.shape(target)[1]),
@@ -203,14 +203,12 @@ class Trainer:
 
 
 
-def translate(inputs, data_loader, trainer, seq_max_len_target=100):
+def translate(inputs, data_loader, model, seq_max_len_target=100):
     if data_loader is None:
         ValueError('data loader is None')
 
-    if trainer is None:
-        ValueError('trainer is None')
 
-    if trainer.model is None:
+    if model is None:
         ValueError('model is None')
 
     if not isinstance(seq_max_len_target, int):
@@ -218,24 +216,25 @@ def translate(inputs, data_loader, trainer, seq_max_len_target=100):
 
     encoded_data = data_loader.encode_data(inputs, mode='source')
     encoded_data = data_loader.texts_to_sequences([encoded_data])
-    encoder_inputs = tf.convert_to_tensor(
-        encoded_data,
-        dtype=tf.int32
-    )
+    encoder_inputs = tf.convert_to_tensor(encoded_data, dtype=tf.int32)
+
     decoder_inputs = [data_loader.dictionary['target']['token2idx']['<s>']]
     decoder_inputs = tf.expand_dims(decoder_inputs, 0)
     decoder_end_token = data_loader.dictionary['target']['token2idx']['</s>']
 
-    for _ in range(seq_max_len_target):
+    maxlen = min(seq_max_len_target, 2 * encoder_inputs.shape[1])
+
+    for i in range(maxlen):
         encoder_padding_mask, look_ahead_mask, decoder_padding_mask = Mask.create_masks(
             encoder_inputs, decoder_inputs
         )
-        pred = trainer.model.call(
-            inputs=encoder_inputs,
-            target=decoder_inputs,
-            inputs_padding_mask=encoder_padding_mask,
-            look_ahead_mask=look_ahead_mask,
-            target_padding_mask=decoder_padding_mask,
+        pred = model.call(
+            [encoder_inputs,
+             decoder_inputs,
+             encoder_padding_mask,
+             look_ahead_mask,
+             decoder_padding_mask,
+             ],
             training=False
         )
         pred = pred[:, -1:, :]
@@ -250,11 +249,12 @@ def translate(inputs, data_loader, trainer, seq_max_len_target=100):
 
 
 def calculate_bleu_score(target_path, ref_path):
-
     get_bleu_score = f"perl {BLEU_CALCULATOR_PATH} {ref_path} < {target_path} > temp"
+    print(get_bleu_score)
     os.system(get_bleu_score)
     with open("temp", "r") as f:
         bleu_score_report = f.read()
+    print(bleu_score_report)
     score = re.findall("BLEU = ([^,]+)", bleu_score_report)[0]
 
     return score, bleu_score_report
