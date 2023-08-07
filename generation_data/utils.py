@@ -2,13 +2,13 @@ import datetime
 import os
 import re
 import time
+import gc
 
 import tensorflow as tf
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 BLEU_CALCULATOR_PATH = os.path.join(CURRENT_DIR_PATH, 'multi-bleu.perl')
-
 
 
 class Mask:
@@ -24,12 +24,12 @@ class Mask:
     @classmethod
     def create_masks(cls, inputs, target):
         encoder_padding_mask = Mask.create_padding_mask(inputs)
-        decoder_padding_mask = Mask.create_padding_mask(target)
+        decoder_padding_mask = Mask.create_padding_mask(inputs)
 
         look_ahead_mask = tf.maximum(
             Mask.create_look_ahead_mask(tf.shape(target)[1]),
             Mask.create_padding_mask(target)
-            )
+        )
 
         return encoder_padding_mask, look_ahead_mask, decoder_padding_mask
 
@@ -132,7 +132,7 @@ class Trainer:
                 if batch % 50 == 0:
                     print(
                         "Epoch: {}, Batch: {}, Loss: {}, Accuracy: {}".format(epoch, batch, self.train_loss.result(),
-                                                                             self.train_accuracy.result()))
+                                                                              self.train_accuracy.result()))
                 if batch % 10000 == 0 and batch != 0:
                     self.checkpoint_manager.save()
             print("{} | Epoch: {} Loss:{}, Accuracy: {}, time: {} sec".format(
@@ -202,11 +202,9 @@ class Trainer:
         return tf.reduce_mean(loss_value)
 
 
-
 def translate(inputs, data_loader, model, seq_max_len_target=100):
     if data_loader is None:
         ValueError('data loader is None')
-
 
     if model is None:
         ValueError('model is None')
@@ -214,12 +212,23 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
     if not isinstance(seq_max_len_target, int):
         ValueError('seq_max_len_target is not int')
 
-    encoded_data = data_loader.encode_data(inputs, mode='source')
-    encoded_data = data_loader.texts_to_sequences([encoded_data])
+    if isinstance(inputs, str):
+        inputs = [inputs]
+
+    encoded_data = []
+    for sentence in inputs:
+        d = data_loader.encode_data(sentence, mode='source')
+        encoded_data.append(d)
+    encoded_data = data_loader.texts_to_sequences(encoded_data)
+    # pad
+    encoded_data = tf.keras.preprocessing.sequence.pad_sequences(
+        encoded_data, maxlen=seq_max_len_target, padding='post'
+    )
     encoder_inputs = tf.convert_to_tensor(encoded_data, dtype=tf.int32)
 
-    decoder_inputs = [data_loader.dictionary['target']['token2idx']['<s>']]
-    decoder_inputs = tf.expand_dims(decoder_inputs, 0)
+    batch_size = encoder_inputs.shape[0]
+    decoder_inputs = [data_loader.dictionary['target']['token2idx']['<s>']] * batch_size
+    decoder_inputs = tf.expand_dims(decoder_inputs, 1)
     decoder_end_token = data_loader.dictionary['target']['token2idx']['</s>']
 
     maxlen = min(seq_max_len_target, 2 * encoder_inputs.shape[1])
@@ -239,13 +248,15 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
         )
         pred = pred[:, -1:, :]
         predicted_id = tf.cast(tf.argmax(pred, axis=-1), dtype=tf.int32)
-
-        if predicted_id == decoder_end_token:
-            break
         decoder_inputs = tf.concat([decoder_inputs, predicted_id], axis=-1)
 
-    total_output = tf.squeeze(decoder_inputs, axis=0)
-    return data_loader.sequences_to_texts([total_output.numpy().tolist()], mode='target')
+        tf.keras.backend.clear_session()
+        gc.collect()
+
+    total_output = [d[:d.index(decoder_end_token)+1] if decoder_end_token in d else d
+                    for d in decoder_inputs.numpy().tolist()]
+    total_output = data_loader.sequences_to_texts(total_output, mode='target')
+    return total_output
 
 
 def calculate_bleu_score(target_path, ref_path):

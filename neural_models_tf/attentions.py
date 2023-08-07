@@ -1,4 +1,3 @@
-
 import numpy as np
 import tensorflow as tf
 
@@ -11,7 +10,7 @@ class ScaledDotProductAttention(tf.keras.layers.Layer):
         super().__init__()
         self.d_h = d_h
         self.softmax = tf.nn.softmax
-        
+
     def get_config(self):
         config = {
             'd_h': self.d_h,
@@ -27,33 +26,30 @@ class ScaledDotProductAttention(tf.keras.layers.Layer):
             scaled_attention_score += (mask * -1e9)
 
         attention_weight = self.softmax(scaled_attention_score)
-        # print('attention_weight', attention_weight.shape)
-        # print('value', value.shape)
+
         return tf.matmul(attention_weight, value), attention_weight
 
-
 def gatingmech(x, y, z, wq=None, wk=None, wv=None):
-    # print('inside gatingmech')
-    # print('x', x.shape)
-    # print('y', y.shape)
+    tempy = y
     if not x.shape == y.shape:
         ty = y.shape[1]
         tx = x.shape[1]
         if ty < tx:
+            repeats = 2 + tx // ty
+            tempy = tf.concat(repeats * [y], axis=1)
+            tempy = tempy[:, :tx, :]
 
-            x = x[:, :ty, :]
         elif tx < ty:
             # repeat x to match y
             repeats = 2 + ty // tx
-            x = tf.concat(repeats*[x], axis=1)
+            x = tf.concat(repeats * [x], axis=1)
             x = x[:, :ty, :]
 
-            z = tf.concat(repeats*[z], axis=1)
+            z = tf.concat(repeats * [z], axis=1)
             z = z[:, :ty, :]
-            # print('inside', x.shape, y.shape, z.shape)
+    # print('inside', x.shape, y.shape, z.shape)
 
-
-    x = x * tf.nn.sigmoid(wq(y))
+    x = x * tf.nn.sigmoid(wq(tempy))
     x = wv(x)
     z = wk(z)
     return x, y, z
@@ -117,13 +113,12 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         mixed = self.mixer(list('abc'))
         unorder = np.argsort(list(mixed))
         self.unmixer = lambda x: [x[i] for i in unorder]
-        
-        
+
     def get_config(self):
         config = {
             'd_model': self.d_model,
-            'attention_head_count' : self.attention_head_count,
-            'comments' : self.comments
+            'attention_head_count': self.attention_head_count,
+            'comments': self.comments
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -133,10 +128,24 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         batch_size = tf.shape(query)[0]
 
         if 'gateattention' in self.comments:
-            key, query, value = self.mixer([key, query, value])
-            value, key, query = gatingmech(value, key, query, wq=self.w_query, wk=self.w_key, wv=self.w_value)
-            key, query, value = self.unmixer([key, query, value])
+            # print('-' * 20)
+            # print('inside1')
+            # print('                 k, q, v')
+            # print(key.shape, query.shape, value.shape)
+            y, z, x = self.mixer([key, query, value])
+            a, b, c = self.mixer(['key', 'query', 'value'])
 
+            # print('inside1.5')
+            # print('xyz:', c, a, b, f'-> {a}g{c}')
+            # print(x.shape, y.shape, z.shape)
+
+            # YgX
+            x, y, z = gatingmech(x, y, z, wq=self.w_query, wk=self.w_key, wv=self.w_value)
+            key, query, value = self.unmixer([y, z, x])
+            y, z, x = self.unmixer([a, b, c])
+            # print('inside2')
+            # print(y, z, x)
+            # print(key.shape, query.shape, value.shape)
         else:
             query = self.w_query(query)
             key = self.w_key(key)
@@ -146,10 +155,10 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         key = self.split_head(key, batch_size)
         value = self.split_head(value, batch_size)
 
-        if not key.shape == query.shape:
-            ty = query.shape[2]
-            key = key[:, :, :ty, :]
-            mask = mask[:, :, :, :ty]
+        # if not key.shape == query.shape:
+        #     ty = query.shape[2]
+        #     key = key[:, :, :ty, :]
+        #     mask = mask[:, :, :, :ty]
 
         output, attention = self.scaled_dot_product(query, key, value, mask)
         output = self.concat_head(output, batch_size)
