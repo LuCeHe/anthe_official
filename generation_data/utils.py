@@ -4,7 +4,9 @@ import re
 import time
 import gc
 
+import numpy as np
 import tensorflow as tf
+import keras_nlp
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -253,8 +255,77 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
         tf.keras.backend.clear_session()
         gc.collect()
 
-    total_output = [d[:d.index(decoder_end_token)+1] if decoder_end_token in d else d
+    total_output = [d[:d.index(decoder_end_token) + 1] if decoder_end_token in d else d
                     for d in decoder_inputs.numpy().tolist()]
+    total_output = data_loader.sequences_to_texts(total_output, mode='target')
+    return total_output
+
+
+def translate_beam_search(inputs, data_loader, model, seq_max_len_target=100, num_beams=5):
+    if data_loader is None:
+        ValueError('data loader is None')
+
+    if model is None:
+        ValueError('model is None')
+
+    if not isinstance(seq_max_len_target, int):
+        ValueError('seq_max_len_target is not int')
+
+    if isinstance(inputs, str):
+        inputs = [inputs]
+
+    encoded_data = []
+    for sentence in inputs:
+        d = data_loader.encode_data(sentence, mode='source')
+        encoded_data.append(d)
+    encoded_data = data_loader.texts_to_sequences(encoded_data)
+
+    # pad
+    encoded_data = tf.keras.preprocessing.sequence.pad_sequences(
+        encoded_data, maxlen=seq_max_len_target, padding='post'
+    )
+    encoder_inputs = tf.convert_to_tensor(encoded_data, dtype=tf.int32)
+
+    batch_size = encoder_inputs.shape[0]
+    decoder_end_token = data_loader.dictionary['target']['token2idx']['</s>']
+    maxlen = min(seq_max_len_target, 2 * encoder_inputs.shape[1])
+    prompt = np.full((batch_size, maxlen), data_loader.dictionary['target']['token2idx']['<s>'], dtype="int32")
+
+    beam_enc = tf.repeat(
+        encoder_inputs,
+        repeats=num_beams,
+        axis=0
+    )
+    # Define a function that outputs the next token's probability given the
+    # input sequence.
+    def token_probability_fn(dec, cache, index):
+
+        encoder_padding_mask, look_ahead_mask, decoder_padding_mask = Mask.create_masks(
+            beam_enc, dec
+        )
+        pred = model.call(
+            [beam_enc,
+             dec,
+             encoder_padding_mask,
+             look_ahead_mask,
+             decoder_padding_mask,
+             ],
+            training=False
+        )[:, index - 1, :]
+        # print(dec.shape)
+        return pred, None, cache
+
+    # Print the generated sequence (token ids).
+    output = keras_nlp.samplers.BeamSampler(num_beams=num_beams)(
+        token_probability_fn,
+        prompt=prompt,
+        end_token_id=decoder_end_token,
+    )
+    # print(output.shape)
+    # print(output.numpy().tolist())
+
+    total_output = [d[:d.index(decoder_end_token) + 1] if decoder_end_token in d else d
+                    for d in output.numpy().tolist()]
     total_output = data_loader.sequences_to_texts(total_output, mode='target')
     return total_output
 
