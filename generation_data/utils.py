@@ -261,7 +261,7 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
     return total_output
 
 
-def translate_beam_search(inputs, data_loader, model, seq_max_len_target=100, num_beams=5):
+def translate_beam_search(inputs, data_loader, model, seq_max_len_target=100, num_beams=3):
     if data_loader is None:
         ValueError('data loader is None')
 
