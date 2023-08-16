@@ -317,14 +317,10 @@ def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, 
     # Define a function that outputs the next token's probability given the
     # input sequence.
     def token_probability_fn(dec, cache, index):
-        print(encoder_inputs.dtype)
-        print(dec.dtype)
-        print('prompt', prompt.dtype, hs.dtype, decoder_end_token)
         encoder_padding_mask, look_ahead_mask, decoder_padding_mask = Mask.create_masks(
             encoder_inputs, dec
         )
 
-        print(encoder_padding_mask.dtype, look_ahead_mask.dtype, decoder_padding_mask.dtype)
         pred = model(
             [encoder_inputs,
              dec,
