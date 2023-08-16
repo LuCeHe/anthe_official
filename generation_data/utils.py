@@ -262,18 +262,6 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
 
 
 def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, num_beams=3, sampler_name='beam'):
-    sampler = None
-    if sampler_name == 'beam':
-        sampler = keras_nlp.samplers.BeamSampler(num_beams=num_beams)
-    elif sampler_name == 'contrastive':
-        sampler = keras_nlp.samplers.ContrastiveSampler()
-    elif sampler_name == 'topk':
-        sampler = keras_nlp.samplers.TopKSampler(k=3)
-    elif sampler_name == 'topp':
-        sampler = keras_nlp.samplers.TopPSampler(p=0.1)
-    else:
-        raise NotImplementedError
-
     if data_loader is None:
         ValueError('data loader is None')
 
@@ -303,21 +291,42 @@ def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, 
     maxlen = min(seq_max_len_target, 2 * encoder_inputs.shape[1])
     prompt = np.full((batch_size, maxlen), data_loader.dictionary['target']['token2idx']['<s>'], dtype="int32")
 
-    beam_enc = tf.repeat(
-        encoder_inputs,
-        repeats=num_beams,
-        axis=0
-    )
+    if sampler_name == 'beam':
+        encoder_inputs = tf.repeat(
+            encoder_inputs,
+            repeats=num_beams,
+            axis=0
+        )
+
+    sampler = None
+    print('sampler_name', sampler_name)
+    sampler_kwargs = {}
+    if sampler_name == 'beam':
+        sampler = keras_nlp.samplers.BeamSampler(num_beams=num_beams)
+    elif sampler_name == 'contrastive':
+        sampler = keras_nlp.samplers.ContrastiveSampler()
+        hs = np.ones([batch_size, 1, 512], dtype="int32")
+        sampler_kwargs.update({'hidden_states': hs})
+    elif sampler_name == 'topk':
+        sampler = keras_nlp.samplers.TopKSampler(k=3)
+    elif sampler_name == 'topp':
+        sampler = keras_nlp.samplers.TopPSampler(p=0.1)
+    else:
+        raise NotImplementedError
 
     # Define a function that outputs the next token's probability given the
     # input sequence.
     def token_probability_fn(dec, cache, index):
-
+        print(encoder_inputs.dtype)
+        print(dec.dtype)
+        print('prompt', prompt.dtype, hs.dtype, decoder_end_token)
         encoder_padding_mask, look_ahead_mask, decoder_padding_mask = Mask.create_masks(
-            beam_enc, dec
+            encoder_inputs, dec
         )
-        pred = model.call(
-            [beam_enc,
+
+        print(encoder_padding_mask.dtype, look_ahead_mask.dtype, decoder_padding_mask.dtype)
+        pred = model(
+            [encoder_inputs,
              dec,
              encoder_padding_mask,
              look_ahead_mask,
@@ -333,9 +342,8 @@ def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, 
         token_probability_fn,
         prompt=prompt,
         end_token_id=decoder_end_token,
+        **sampler_kwargs
     )
-    # print(output.shape)
-    # print(output.numpy().tolist())
 
     total_output = [d[:d.index(decoder_end_token) + 1] if decoder_end_token in d else d
                     for d in output.numpy().tolist()]
