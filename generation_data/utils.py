@@ -261,7 +261,19 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
     return total_output
 
 
-def translate_beam_search(inputs, data_loader, model, seq_max_len_target=100, num_beams=3):
+def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, num_beams=3, sampler_name='beam'):
+    sampler = None
+    if sampler_name == 'beam':
+        sampler = keras_nlp.samplers.BeamSampler(num_beams=num_beams)
+    elif sampler_name == 'contrastive':
+        sampler = keras_nlp.samplers.ContrastiveSampler()
+    elif sampler_name == 'topk':
+        sampler = keras_nlp.samplers.TopKSampler(k=3)
+    elif sampler_name == 'topp':
+        sampler = keras_nlp.samplers.TopPSampler(p=0.1)
+    else:
+        raise NotImplementedError
+
     if data_loader is None:
         ValueError('data loader is None')
 
@@ -296,6 +308,7 @@ def translate_beam_search(inputs, data_loader, model, seq_max_len_target=100, nu
         repeats=num_beams,
         axis=0
     )
+
     # Define a function that outputs the next token's probability given the
     # input sequence.
     def token_probability_fn(dec, cache, index):
@@ -316,7 +329,7 @@ def translate_beam_search(inputs, data_loader, model, seq_max_len_target=100, nu
         return pred, None, cache
 
     # Print the generated sequence (token ids).
-    output = keras_nlp.samplers.BeamSampler(num_beams=num_beams)(
+    output = sampler(
         token_probability_fn,
         prompt=prompt,
         end_token_id=decoder_end_token,
