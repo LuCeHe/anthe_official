@@ -224,16 +224,28 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
     encoded_data = data_loader.texts_to_sequences(encoded_data)
     # pad
     encoded_data = tf.keras.preprocessing.sequence.pad_sequences(
-        encoded_data, maxlen=seq_max_len_target, padding='post'
+        encoded_data, padding='post'
     )
     encoder_inputs = tf.convert_to_tensor(encoded_data, dtype=tf.int32)
 
-    batch_size = encoder_inputs.shape[0]
-    decoder_inputs = [data_loader.dictionary['target']['token2idx']['<s>']] * batch_size
-    decoder_inputs = tf.expand_dims(decoder_inputs, 1)
-    decoder_end_token = data_loader.dictionary['target']['token2idx']['</s>']
+    maxlen = max(min(seq_max_len_target, 2 * encoder_inputs.shape[1]), encoder_inputs.shape[1])
 
-    maxlen = min(seq_max_len_target, 2 * encoder_inputs.shape[1])
+    # pad
+    encoder_inputs = tf.keras.preprocessing.sequence.pad_sequences(
+        encoder_inputs, padding='post', maxlen=maxlen
+    )
+
+    batch_size = encoder_inputs.shape[0]
+    decoder_inputs = [[data_loader.dictionary['target']['token2idx']['<s>']]] * batch_size
+
+    decoder_inputs = tf.keras.preprocessing.sequence.pad_sequences(
+        decoder_inputs, maxlen=maxlen, padding='post'
+    )
+
+    encoder_inputs = tf.convert_to_tensor(encoder_inputs, dtype=tf.int32)
+    decoder_inputs = tf.convert_to_tensor(decoder_inputs, dtype=tf.int32)
+
+    decoder_end_token = data_loader.dictionary['target']['token2idx']['</s>']
 
     for i in range(maxlen):
         encoder_padding_mask, look_ahead_mask, decoder_padding_mask = Mask.create_masks(
@@ -248,15 +260,25 @@ def translate(inputs, data_loader, model, seq_max_len_target=100):
              ],
             training=False
         )
-        pred = pred[:, -1:, :]
+        pred = pred[:, i, :][:, None, :].numpy()
+
+        pred[:, 0, 0] = -np.inf
+        if i < 4:
+            pred[:, 0, 3] = -np.inf
+
         predicted_id = tf.cast(tf.argmax(pred, axis=-1), dtype=tf.int32)
-        decoder_inputs = tf.concat([decoder_inputs, predicted_id], axis=-1)
+        decoder_inputs = decoder_inputs.numpy()
+        if i < maxlen - 1:
+            decoder_inputs[:, i + 1] = predicted_id[:, 0]  # TODO
+        decoder_inputs = tf.convert_to_tensor(decoder_inputs, dtype=tf.int32)
 
         tf.keras.backend.clear_session()
         gc.collect()
 
-    total_output = [d[:d.index(decoder_end_token) + 1] if decoder_end_token in d else d
-                    for d in decoder_inputs.numpy().tolist()]
+    total_output = [
+        d[:d.index(decoder_end_token) + 1] if decoder_end_token in d else d
+        for d in decoder_inputs.numpy().tolist()
+    ]
     total_output = data_loader.sequences_to_texts(total_output, mode='target')
     return total_output
 
@@ -308,9 +330,11 @@ def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, 
         hs = np.ones([batch_size, 1, 512], dtype="int32")
         sampler_kwargs.update({'hidden_states': hs})
     elif sampler_name == 'topk':
-        sampler = keras_nlp.samplers.TopKSampler(k=3)
+        sampler = keras_nlp.samplers.TopKSampler(k=100)
     elif sampler_name == 'topp':
-        sampler = keras_nlp.samplers.TopPSampler(p=0.1)
+        sampler = keras_nlp.samplers.TopPSampler(p=0.5)
+    elif sampler_name == 'kerasgreedy':
+        sampler = keras_nlp.samplers.GreedySampler()
     else:
         raise NotImplementedError
 
@@ -329,8 +353,11 @@ def translate_keras_sampler(inputs, data_loader, model, seq_max_len_target=100, 
              decoder_padding_mask,
              ],
             training=False
-        )[:, index - 1, :]
-        # print(dec.shape)
+        )[:, index - 1, :].numpy()
+
+        pred[:, 0] = -np.inf
+        pred = tf.convert_to_tensor(pred, dtype=tf.float32)
+
         return pred, None, cache
 
     # Print the generated sequence (token ids).
